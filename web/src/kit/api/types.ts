@@ -12,13 +12,15 @@ export interface Problem {
 
 export interface Check { name: string; ok: boolean; detail: string }
 
-export type VersionStatus = 'draft' | 'tested' | 'submitted' | 'active' | 'superseded' | 'retired';
+export type VersionStatus = 'draft' | 'tested' | 'submitted' | 'returned' | 'active' | 'superseded' | 'retired' | 'discarded';
+export type Approval = 'auto' | 'single' | 'maker_checker';
 export type RecordStatus = 'draft' | 'active' | 'paused' | 'retired';
 
 export interface VersionView<S = Record<string, unknown>> {
   version: number; status: VersionStatus; spec: S;
   createdBy: string; submittedBy: string | null; approvedBy: string | null;
   testResult: Check[] | null; editedBy: string[]; makerChecker: boolean; createdAt: string;
+  testedBy: string | null; testedAt: string | null; reason: string | null;
 }
 
 export interface GovernedRecord<S = Record<string, unknown>> {
@@ -49,11 +51,12 @@ export interface JsonSchema {
 
 export interface KindInfo {
   kind: string; plural: string; display: Record<string, string>; makerChecker: 'always' | 'never' | 'policy';
+  approval: Approval; requireTest: boolean;
   schema: JsonSchema; capabilities: { read: string; write: string; approve: string }; tests: string[];
 }
 
 export interface Transition {
-  name: 'test' | 'submit' | 'approve' | 'reject' | 'pause' | 'resume' | 'retire';
+  name: 'test' | 'submit' | 'approve' | 'reject' | 'pause' | 'resume' | 'retire' | 'discard';
   from?: VersionStatus[]; record?: RecordStatus[]; to: string; capability: 'write' | 'approve'; reason?: boolean;
 }
 

@@ -17,6 +17,12 @@ EGRESS_BLOCKED:        {status: 403, retryable: false, title: Outbound call bloc
 INVALID_TRANSITION:    {status: 409, retryable: false, title: Transition not allowed, remedy: Check the record's current state.}
 MAKER_CHECKER:         {status: 403, retryable: false, title: Second person required, remedy: Ask a different person to approve.}
 NOT_TESTED:            {status: 409, retryable: false, title: Test required, remedy: Run the test and fix any failed checks before submitting.}
+NO_DRAFT:              {status: 409, retryable: false, title: No draft, remedy: Edit the record to start a draft.}
+DRAFT_SUBMITTED:       {status: 409, retryable: false, title: Waiting for approval, remedy: Wait for the approver, or ask them to return the version.}
+NOT_SUBMITTED:         {status: 409, retryable: false, title: Nothing to approve, remedy: Submit the version first.}
+NOT_ACTIVE:            {status: 409, retryable: false, title: Not active, remedy: Only an active record can be paused.}
+NOT_PAUSED:            {status: 409, retryable: false, title: Not paused, remedy: Only a paused record can be resumed.}
+RECORD_RETIRED:        {status: 409, retryable: false, title: Retired, remedy: A retired record cannot change; create a new one.}
 PLUGIN_NOT_FOUND:      {status: 404, retryable: false, title: Plugin not found, remedy: Check the plugin id and version, or install the plugin.}
 PLUGIN_FAILED:         {status: 502, retryable: true,  title: Plugin failed, remedy: Check the plugin's configuration and logs.}
 EXPRESSION_INVALID:    {status: 422, retryable: false, title: Expression not valid, remedy: Correct the expression; the detail names the problem.}

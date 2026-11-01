@@ -230,7 +230,7 @@ wheels = [
 
 [[package]]
 name = "exemplar-connections"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "exemplar/service" }
 dependencies = [
     { name = "platform-kernel" },
@@ -245,7 +245,7 @@ requires-dist = [
 
 [[package]]
 name = "exemplar-echo-connector"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "exemplar/plugin" }
 dependencies = [
     { name = "platform-plugin-sdk" },
@@ -568,7 +568,7 @@ dev = [
 
 [[package]]
 name = "platform-kernel"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/platform-kernel" }
 dependencies = [
     { name = "fastapi" },
@@ -610,7 +610,7 @@ provides-extras = ["postgres"]
 
 [[package]]
 name = "platform-plugin-sdk"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/platform-plugin-sdk" }
 dependencies = [
     { name = "pydantic" },
@@ -621,7 +621,7 @@ requires-dist = [{ name = "pydantic", specifier = ">=2.7" }]
 
 [[package]]
 name = "platform-testing"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/platform-testing" }
 dependencies = [
     { name = "jsonschema" },
@@ -638,7 +638,7 @@ requires-dist = [
 
 [[package]]
 name = "platform-tools"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/platform-tools" }
 dependencies = [
     { name = "import-linter" },

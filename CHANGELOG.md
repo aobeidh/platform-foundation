@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.0 (unreleased)
+
+### platform-kernel
+- Approval policy in the governed-record engine (ADR 0006): `auto`, `single` and `maker_checker`, with or without a
+  required test, per kind through the `ApprovalPolicy` port (settings `APPROVAL`, `REQUIRE_TEST`, or
+  `with_approval_policy`). Kinds may set a floor or a ceiling.
+- Rejected versions are `returned` with the reason; `discard` drops a pending version and retires a record that never
+  ran. Versions record who tested them and when (migration 0004).
+- Lifecycle refusals use specific codes: `NO_DRAFT`, `DRAFT_SUBMITTED`, `NOT_SUBMITTED`, `NOT_ACTIVE`, `NOT_PAUSED`,
+  `RECORD_RETIRED`.
+- `/portal/kinds` reports each kind's approval rule; `GovernedKind.json_schema` lets a product serve its own schema.
+
+### Review fixes before release
+- Auto approval records submitted and approved in one unit of work (F9).
+- A draft after a discarded one gets a new number; discarded versions stay in history.
+- A failed test blocks submit and approval even when tests are not required; approval needs a test when the rule in
+  force requires one.
+- Retiring withdraws a returned version too.
+
+### @platform/web-kit
+- Discard action, returned versions with their reason, submit and approve enabled by each kind's rule; the simulated
+  provider follows the approval policy; the recorded journey covers return and discard.
+
 ## 0.3.0 (unreleased)
 
 ### platform-kernel

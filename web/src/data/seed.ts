@@ -15,6 +15,7 @@ export const identities: DemoIdentity[] = [
 const kinds: Kinds = {
   items: [{
     kind: 'connection', plural: 'connections', display: { en: 'Connection', ar: 'اتصال' }, makerChecker: 'policy',
+    approval: 'maker_checker', requireTest: true,
     schema: {
       description: 'The governed spec of a connection: which connector plugin, which version, and its configuration.',
       properties: {
@@ -29,13 +30,14 @@ const kinds: Kinds = {
     tests: ['config_valid', 'plugin_test'],
   }],
   lifecycle: {
-    versionStates: ['draft', 'tested', 'submitted', 'active', 'superseded', 'retired'],
+    versionStates: ['draft', 'tested', 'submitted', 'returned', 'active', 'superseded', 'retired', 'discarded'],
     recordStates: ['draft', 'active', 'paused', 'retired'],
     transitions: [
-      { name: 'test', from: ['draft', 'tested'], to: 'tested', capability: 'write' },
-      { name: 'submit', from: ['tested'], to: 'submitted', capability: 'write' },
+      { name: 'test', from: ['draft', 'tested', 'returned'], to: 'tested', capability: 'write' },
+      { name: 'submit', from: ['draft', 'tested', 'returned'], to: 'submitted', capability: 'write' },
       { name: 'approve', from: ['submitted'], to: 'active', capability: 'approve' },
-      { name: 'reject', from: ['submitted'], to: 'draft', capability: 'approve', reason: true },
+      { name: 'reject', from: ['submitted'], to: 'returned', capability: 'approve', reason: true },
+      { name: 'discard', from: ['draft', 'tested', 'returned'], to: 'discarded', capability: 'write' },
       { name: 'pause', record: ['active'], to: 'paused', capability: 'write' },
       { name: 'resume', record: ['paused'], to: 'active', capability: 'write' },
       { name: 'retire', record: ['draft', 'active', 'paused'], to: 'retired', capability: 'write' },
@@ -185,7 +187,8 @@ export function initialState(now: Date): SimState {
         else status = 'draft';
       }
       versions.push({ version: v, status, spec, createdBy: p.by, submittedBy, approvedBy, testResult, editedBy: [p.by],
-        makerChecker: true, createdAt: vCreated.toISOString() });
+        makerChecker: true, createdAt: vCreated.toISOString(), testedBy: testResult ? p.by : null,
+        testedAt: testResult ? vCreated.toISOString() : null, reason: null });
       t += (p.daysAgo / p.versions) * day * (0.94 + rand() * 0.05);
     }
     const recordStatus = p.status === 'paused' ? 'paused' : p.status === 'retired' ? 'retired' : live ? 'active' : 'draft';

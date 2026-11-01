@@ -1,7 +1,7 @@
 {
   "name": "@platform/web-kit",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "description": "Portal kit for products built on the platform foundation: tokens, atomic components, ECharts charts, the API port and governed-record screens, plus the exemplar portal.",
   "scripts": {

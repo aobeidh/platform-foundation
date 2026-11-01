@@ -4,18 +4,21 @@ import { PipelineGates, type Gate } from '@/ui/viz/pipeline-gates';
 import { dateTime } from '@/lib/format';
 
 /** The current version's place in the governed lifecycle, as gates: draft, tested, submitted, approved, running. */
-export function LifecycleGates({ record }: { record: GovernedRecord<object> }) {
+export function LifecycleGates({ record, requireTest = true }: { record: GovernedRecord<object>; requireTest?: boolean }) {
   const { t } = useTranslation();
   const v = record.current;
   const failed = v.testResult?.filter((c) => !c.ok).length ?? 0;
   const order = ['draft', 'tested', 'submitted', 'active'] as const;
-  const reached = v.status === 'superseded' || v.status === 'retired' ? 3 : order.indexOf(v.status as (typeof order)[number]);
+  const reached = v.status === 'superseded' || v.status === 'retired' ? 3 : v.status === 'returned' || v.status === 'discarded' ? 0
+    : order.indexOf(v.status as (typeof order)[number]);
+  const skipTest = !requireTest && !v.testResult && reached >= 0;
   const passed = (i: number) => i <= reached;
   const authors = [...new Set([v.createdBy, ...v.editedBy, ...(v.submittedBy ? [v.submittedBy] : [])])].join(', ');
   const gates: Gate[] = [
     { id: 'draft', label: t('gate.draft'), state: 'passed', meta: v.createdBy },
-    { id: 'tested', label: t('gate.tested'), state: passed(1) ? 'passed' : 'blocked',
-      reason: failed ? t('gate.why.test', { n: failed }) : t('gate.why.untested'), meta: v.testResult ? `${v.testResult.length} ✓` : undefined },
+    { id: 'tested', label: t('gate.tested'), state: passed(1) || skipTest ? 'passed' : 'blocked',
+      reason: v.status === 'returned' ? t('gate.why.returned', { reason: v.reason ?? '' }) : failed ? t('gate.why.test', { n: failed }) : t('gate.why.untested'),
+      meta: v.testResult ? `${v.testResult.length} ✓` : skipTest ? t('gate.skipped') : undefined },
     { id: 'submitted', label: t('gate.submitted'), state: passed(2) ? 'passed' : 'blocked', reason: t('gate.why.submit'), meta: v.submittedBy ?? undefined },
     { id: 'approved', label: t('gate.approved'), state: passed(3) ? 'passed' : 'blocked', reason: t('gate.why.approve', { who: authors }), meta: v.approvedBy ?? undefined },
     { id: 'live', label: t('gate.live'),

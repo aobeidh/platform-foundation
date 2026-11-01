@@ -57,6 +57,13 @@ async function journey() {
   await call('batchNoUse', 'POST', `${base}/nope/send-batch`, OMAR, { payloads: [{}] });
   await call('pluginsApprover', 'GET', '/api/v1/portal/plugins', OMAR);
   await call('operationsBadLimit', 'GET', '/api/v1/operations?limit=0', ADA);
+  let r = (await sim.send({ method: 'POST', path: base, headers: ADA, body: spec('Returned', 'R') })).body as Record<string, unknown>;
+  r = (await sim.send({ method: 'POST', path: `${base}/${String(r.id)}/test`, headers: at(ADA, r) })).body as Record<string, unknown>;
+  r = (await sim.send({ method: 'POST', path: `${base}/${String(r.id)}/submit`, headers: at(ADA, r) })).body as Record<string, unknown>;
+  r = await call('returned', 'POST', `${base}/${String(r.id)}/reject`, at(OMAR, r), { reason: 'wrong prefix' });
+  await call('approveReturned', 'POST', `${base}/${String(r.id)}/approve`, at(OMAR, r));
+  r = await call('discarded', 'POST', `${base}/${String(r.id)}/discard`, at(ADA, r));
+  await sim.send({ method: 'PUT', path: `${base}/${String(r.id)}/draft`, headers: at(ADA, r), body: spec('Returned', 'R') }).then((x) => { out.editRetired = { status: x.status, body: x.body }; });
   await call('anon', 'GET', '/api/v1/portal/me');
   return out;
 }
@@ -78,7 +85,11 @@ describe('simulated provider conformance with the exemplar service', async () =>
   it('enforces the same rules with the same codes and wording', () => {
     const code = (k: string) => (live[k].body as { code: string }).code;
     const echo = (b: unknown) => (b as { items: { id: string }[] }).items.find((p) => p.id === 'echo');
-    const keys = ['selfApprove', 'forbidden', 'stale', 'invalid', 'anon', 'batchNotActive', 'batchMissing', 'batchEmpty', 'batchNoUse', 'operationsBadLimit'];
+    const keys = ['selfApprove', 'forbidden', 'stale', 'invalid', 'anon', 'batchNotActive', 'batchMissing', 'batchEmpty', 'batchNoUse', 'operationsBadLimit', 'approveReturned', 'editRetired'];
+    const st = (k: string) => { const b = live[k].body as { status: string; current: { status: string; reason: string | null } }; return [b.status, b.current.status, b.current.reason]; };
+    const rst = (k: string) => { const b = real[k].body as { status: string; current: { status: string; reason: string | null } }; return [b.status, b.current.status, b.current.reason]; };
+    expect(st('returned')).toEqual(rst('returned'));
+    expect(st('discarded')).toEqual(rst('discarded'));
     expect(keys.map(code)).toEqual(keys.map((k) => (real[k].body as { code: string }).code));
     expect(live.pluginsApprover.body).toEqual(expect.objectContaining({ detail: false }));
     expect(echo(live.pluginsApprover.body)).toEqual(echo(real.pluginsApprover.body));

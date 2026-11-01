@@ -9,16 +9,43 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 from platform_plugin_sdk import Check
 from pydantic import BaseModel
 
-VersionStatus = Literal["draft", "tested", "submitted", "active", "superseded", "retired"]
+VersionStatus = Literal["draft", "tested", "submitted", "returned", "active", "superseded", "retired", "discarded"]
 RecordStatus = Literal["draft", "active", "paused", "retired"]
 MakerChecker = Literal["always", "never", "policy"]
+Approval = Literal["auto", "single", "maker_checker"]
+PENDING = frozenset({"draft", "tested", "returned"})  # a version that can still be edited, tested or discarded
 
 KindTest = Callable[[BaseModel], list[Check]]
+
+
+@dataclass(frozen=True)
+class ApprovalRule:
+    """What submitting means for a kind (P14). `auto`: submitting activates at once. `single`: anyone holding the
+    approve capability approves, the maker included. `maker_checker`: someone who did not create, edit or submit
+    the version approves. `require_test`: submitting needs a passing test."""
+
+    approval: Approval = "maker_checker"
+    require_test: bool = True
+
+
+class ApprovalPolicy(Protocol):
+    """Port: the deployment decides the rule per kind. Products may store it as governed settings of their own."""
+
+    def rule_for(self, kind: str) -> ApprovalRule: ...
+
+
+@dataclass(frozen=True)
+class StaticApprovalPolicy:
+    default: ApprovalRule = ApprovalRule()
+    kinds: dict[str, ApprovalRule] = field(default_factory=dict)
+
+    def rule_for(self, kind: str) -> ApprovalRule:
+        return self.kinds.get(kind, self.default)
 
 
 @dataclass(frozen=True)
@@ -29,11 +56,13 @@ class GovernedKind:
     plural: str
     spec: type[BaseModel]
     tests: tuple[KindTest, ...] = ()
-    maker_checker: MakerChecker = "policy"
+    maker_checker: MakerChecker = "policy"  # deprecated in 0.4: "always" is a floor of maker_checker, "never" a
+    # ceiling of single; "policy" (default) follows the ApprovalPolicy. Prefer configuring the policy.
     read: str = ""
     write: str = ""
     approve: str = ""
     display: dict[str, str] = field(default_factory=lambda: {"en": ""})
+    json_schema: dict[str, Any] | None = None  # served by /portal/kinds instead of the model's schema, if set
 
     def __post_init__(self) -> None:
         if not self.read or not self.write or not self.approve:
@@ -55,6 +84,9 @@ class Version:
     approved_by: str | None = None
     test_result: list[dict[str, Any]] | None = None
     edited_by: tuple[str, ...] = ()
+    tested_by: str | None = None
+    tested_at: datetime | None = None
+    reason: str | None = None  # why it was returned
 
     @property
     def authors(self) -> frozenset[str]:
@@ -93,7 +125,8 @@ class GovernedView:
                 return None
             return {"version": x.version, "status": x.status, "spec": x.spec, "createdBy": x.created_by,
                     "submittedBy": x.submitted_by, "approvedBy": x.approved_by, "testResult": x.test_result,
-                    "editedBy": list(x.edited_by),
+                    "editedBy": list(x.edited_by), "testedBy": x.tested_by,
+                    "testedAt": x.tested_at.isoformat() if x.tested_at else None, "reason": x.reason,
                     "makerChecker": x.maker_checker, "createdAt": x.created_at.isoformat()}
 
         r = self.record

@@ -63,6 +63,13 @@ def run(platform: Any, client: Any) -> dict[str, Any]:
     keep("batchNoUse", client.post(f"{base}/nope/send-batch", headers=OMAR, json={"payloads": [{}]}))
     keep("pluginsApprover", client.get("/api/v1/portal/plugins", headers=OMAR))
     keep("operationsBadLimit", client.get("/api/v1/operations?limit=0", headers=ADA))
+    r = client.post(base, headers=ADA, json=spec("Returned", "R")).json()
+    r = client.post(f"{base}/{r['id']}/test", headers=at(ADA, r)).json()
+    r = client.post(f"{base}/{r['id']}/submit", headers=at(ADA, r)).json()
+    r = keep("returned", client.post(f"{base}/{r['id']}/reject", headers=at(OMAR, r), json={"reason": "wrong prefix"}))
+    keep("approveReturned", client.post(f"{base}/{r['id']}/approve", headers=at(OMAR, r)))
+    r = keep("discarded", client.post(f"{base}/{r['id']}/discard", headers=at(ADA, r)))
+    keep("editRetired", client.put(f"{base}/{r['id']}/draft", headers=at(ADA, r), json=spec("Returned", "R")))
     keep("anon", client.get("/api/v1/portal/me"))
     return out
 

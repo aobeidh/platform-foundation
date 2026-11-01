@@ -69,7 +69,8 @@ def _version(row: Any) -> Version:
     return Version(kind=row.kind, id=row.id, version=row.version, tenant=row.tenant_id, status=row.status,
                    spec=row.spec, maker_checker=row.maker_checker, created_by=row.created_by,
                    created_at=row.created_at, submitted_by=row.submitted_by, approved_by=row.approved_by,
-                   test_result=row.test_result, edited_by=tuple(row.edited_by or ()))
+                   test_result=row.test_result, edited_by=tuple(row.edited_by or ()),
+                   tested_by=row.tested_by, tested_at=row.tested_at, reason=row.reason)
 
 
 class PostgresGovernedStore:
@@ -142,14 +143,16 @@ class PostgresGovernedStore:
 
         uow.connection.execute(text(
             "insert into governed_version (kind, id, version, tenant_id, status, spec, maker_checker, created_by, "
-            "submitted_by, approved_by, test_result, edited_by, created_at) values (:kind, :id, :v, :tenant, "
-            ":status, cast(:spec as jsonb), :mc, :cb, :sb, :ab, cast(:tr as jsonb), :eb, :ca) "
+            "submitted_by, approved_by, test_result, edited_by, created_at, tested_by, tested_at, reason) values "
+            "(:kind, :id, :v, :tenant, :status, cast(:spec as jsonb), :mc, :cb, :sb, :ab, cast(:tr as jsonb), :eb, "
+            ":ca, :tb, :ta, :reason) "
             "on conflict (kind, id, version) do update set status = excluded.status, spec = excluded.spec, "
-            "submitted_by = excluded.submitted_by, approved_by = excluded.approved_by, "
-            "test_result = excluded.test_result, edited_by = excluded.edited_by"),
+            "maker_checker = excluded.maker_checker, submitted_by = excluded.submitted_by, "
+            "approved_by = excluded.approved_by, test_result = excluded.test_result, edited_by = excluded.edited_by, "
+            "tested_by = excluded.tested_by, tested_at = excluded.tested_at, reason = excluded.reason"),
             {"kind": version.kind, "id": version.id, "v": version.version, "tenant": version.tenant,
              "status": version.status, "spec": json.dumps(version.spec, default=str), "mc": version.maker_checker,
              "cb": version.created_by, "sb": version.submitted_by, "ab": version.approved_by,
              "tr": json.dumps(version.test_result) if version.test_result is not None else None,
-             "eb": list(version.edited_by),
+             "eb": list(version.edited_by), "tb": version.tested_by, "ta": version.tested_at, "reason": version.reason,
              "ca": version.created_at if isinstance(version.created_at, datetime) else version.created_at})

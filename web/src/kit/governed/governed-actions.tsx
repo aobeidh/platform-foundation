@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, CheckCircle2, FlaskConical, Pause, Play, Send, XCircle } from 'lucide-react';
+import { Archive, CheckCircle2, FlaskConical, Pause, Play, Send, Trash2, XCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCan, useMe, useTransition, type GovernedRecord, type KindInfo, type Transition } from '@/kit/api';
 import { Button } from '@/ui/atoms/button';
@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/ui/atoms/tooltip';
 import { ProblemAlert } from './problem';
 
 const ICON: Record<Transition['name'], React.ReactNode> = {
-  test: <FlaskConical />, submit: <Send />, approve: <CheckCircle2 />, reject: <XCircle />, pause: <Pause />, resume: <Play />, retire: <Archive />,
+  test: <FlaskConical />, submit: <Send />, approve: <CheckCircle2 />, reject: <XCircle />, pause: <Pause />, resume: <Play />, retire: <Archive />, discard: <Trash2 />,
 };
 
 export interface Availability { name: Transition['name']; enabled: boolean; why?: string }
@@ -23,13 +23,16 @@ export function useAvailability(record: GovernedRecord<object>, kind: KindInfo):
   const authors = new Set([v.createdBy, ...v.editedBy, ...(v.submittedBy ? [v.submittedBy] : [])]);
   const status = t(`status.${v.status}`);
   const capOf = (n: Transition['name']) => (n === 'approve' || n === 'reject' ? kind.capabilities.approve : kind.capabilities.write);
+  const pending = record.status !== 'retired' && (v.status === 'draft' || v.status === 'tested' || v.status === 'returned');
+  const strict = v.makerChecker || kind.approval === 'maker_checker';
   const list: { name: Transition['name']; applies: boolean; ok: boolean; why?: string }[] = [
-    { name: 'test', applies: record.status !== 'retired' && (v.status === 'draft' || v.status === 'tested'), ok: true },
-    { name: 'submit', applies: record.status !== 'retired' && (v.status === 'draft' || v.status === 'tested'), ok: v.status === 'tested', why: t('act.why.state', { status }) },
-    { name: 'approve', applies: v.status === 'submitted', ok: !(v.makerChecker && me.data && authors.has(me.data.subject)), why: t('act.why.author') },
+    { name: 'test', applies: pending, ok: true },
+    { name: 'submit', applies: pending, ok: (!kind.requireTest || v.status === 'tested') && !v.testResult?.some((c) => !c.ok), why: t('act.why.state', { status }) },
+    { name: 'approve', applies: v.status === 'submitted', ok: !(strict && me.data && authors.has(me.data.subject)), why: t('act.why.author') },
     { name: 'reject', applies: v.status === 'submitted', ok: true },
     { name: 'pause', applies: record.status === 'active', ok: true },
     { name: 'resume', applies: record.status === 'paused', ok: true },
+    { name: 'discard', applies: pending, ok: true },
     { name: 'retire', applies: record.status !== 'retired', ok: true },
   ];
   return list.filter((a) => a.applies).map((a) => {
@@ -44,13 +47,14 @@ export function GovernedActions({ record, kind, onDone }: { record: GovernedReco
   const { t } = useTranslation();
   const actions = useAvailability(record, kind);
   const mutation = useTransition<object>(kind.plural);
-  const [dialog, setDialog] = useState<null | 'reject' | 'retire'>(null);
+  const [dialog, setDialog] = useState<null | 'reject' | 'retire' | 'discard'>(null);
   const [reason, setReason] = useState('');
   const run = (name: Transition['name'], why?: string) => {
     mutation.mutate({ id: record.id, name, revision: record.revision, reason: why }, {
       onSuccess: (r) => {
         setDialog(null); setReason('');
         if (name === 'test') onDone(r.current.status === 'tested' ? t('act.done.test.ok') : t('act.done.test.fail'), r.current.status === 'tested');
+        else if (name === 'submit' && r.current.status === 'active') onDone(t('act.done.approve.auto'), true);
         else onDone(t(`act.done.${name}`, { v: r.activeVersion }), true);
       },
     });
@@ -60,11 +64,11 @@ export function GovernedActions({ record, kind, onDone }: { record: GovernedReco
     <>
       <div className="flex flex-wrap items-center gap-2">
         {actions.map((a) => {
-          const variant = a.name === primary ? 'default' : a.name === 'retire' || a.name === 'reject' ? 'outline' : 'secondary';
+          const variant = a.name === primary ? 'default' : a.name === 'retire' || a.name === 'reject' || a.name === 'discard' ? 'outline' : 'secondary';
           const button = (
             <Button key={a.name} size="sm" variant={variant} disabled={!a.enabled || mutation.isPending}
               loading={mutation.isPending && mutation.variables?.name === a.name}
-              onClick={() => (a.name === 'reject' || a.name === 'retire' ? setDialog(a.name) : run(a.name))}>
+              onClick={() => (a.name === 'reject' || a.name === 'retire' || a.name === 'discard' ? setDialog(a.name) : run(a.name))}>
               {ICON[a.name]}{mutation.isPending && mutation.variables?.name === a.name && a.name === 'test' ? t('act.testing') : t(`act.${a.name}`)}
             </Button>
           );
@@ -81,8 +85,8 @@ export function GovernedActions({ record, kind, onDone }: { record: GovernedReco
       <Dialog open={dialog !== null} onOpenChange={(o) => { if (!o) { setDialog(null); mutation.reset(); } }}>
         <DialogContent className="glass-strong">
           <DialogHeader>
-            <DialogTitle>{dialog === 'reject' ? t('act.reject.t', { v: record.currentVersion }) : t('act.retire.t')}</DialogTitle>
-            <DialogDescription>{dialog === 'reject' ? t('act.reject.d') : t('act.retire.d')}</DialogDescription>
+            <DialogTitle>{dialog === 'reject' ? t('act.reject.t', { v: record.currentVersion }) : dialog === 'discard' ? t('act.discard.t') : t('act.retire.t')}</DialogTitle>
+            <DialogDescription>{dialog === 'reject' ? t('act.reject.d') : dialog === 'discard' ? t('act.discard.d') : t('act.retire.d')}</DialogDescription>
           </DialogHeader>
           {dialog === 'reject' && (
             <div className="grid gap-1.5">
@@ -96,7 +100,9 @@ export function GovernedActions({ record, kind, onDone }: { record: GovernedReco
             <Button variant="ghost" onClick={() => setDialog(null)}>{t('common.cancel')}</Button>
             {dialog === 'reject'
               ? <Button disabled={!reason.trim()} loading={mutation.isPending} onClick={() => run('reject', reason.trim())}>{t('act.reject')}</Button>
-              : <Button variant="destructive" loading={mutation.isPending} onClick={() => run('retire')}>{t('act.retire')}</Button>}
+              : dialog === 'discard'
+                ? <Button variant="destructive" loading={mutation.isPending} onClick={() => run('discard')}>{t('act.discard')}</Button>
+                : <Button variant="destructive" loading={mutation.isPending} onClick={() => run('retire')}>{t('act.retire')}</Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>

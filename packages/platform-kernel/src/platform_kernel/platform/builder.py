@@ -14,7 +14,16 @@ from ..config import MemorySecretStore, PlatformSettings, SecretStore, UnknownPr
 from ..core import Clock, SystemClock
 from ..errors import ErrorCatalog, kernel_catalog
 from ..expressions import ExpressionEngine, ExpressionRegistry, JsonataEngine
-from ..governance import GovernanceEngine, GovernedKind, MemoryGovernedStore, PostgresGovernedStore, governed_router
+from ..governance import (
+    ApprovalPolicy,
+    ApprovalRule,
+    GovernanceEngine,
+    GovernedKind,
+    MemoryGovernedStore,
+    PostgresGovernedStore,
+    StaticApprovalPolicy,
+    governed_router,
+)
 from ..http import Authorizer, EgressPolicy, HttpSettings, OAuthTokenService, ResilientClient, create_app
 from ..identity import CachedJwksSource, DemoTokenVerifier, OidcTokenVerifier, TokenVerifier
 from ..messaging import ConsumerRuntime, LocalTransport, PollingRelay
@@ -178,6 +187,7 @@ class PlatformBuilder:
         self._clock: Clock = SystemClock()
         self._errors = kernel_catalog()
         self._verifier: TokenVerifier | None = None
+        self._approval: ApprovalPolicy | None = None
         self._policy: PolicyEngine | None = None
         self._capabilities = CapabilityCatalog()
         self._roles: list[Role] = []
@@ -228,6 +238,12 @@ class PlatformBuilder:
 
     def with_egress(self, policy: EgressPolicy) -> PlatformBuilder:
         self._egress = policy
+        return self
+
+    def with_approval_policy(self, policy: ApprovalPolicy) -> PlatformBuilder:
+        """Decide what submitting means per governed kind. Without it, settings.approval and settings.require_test
+        apply to every kind."""
+        self._approval = policy
         return self
 
     def with_governed_kinds(self, kinds: Iterable[GovernedKind]) -> PlatformBuilder:
@@ -396,8 +412,9 @@ class PlatformBuilder:
                 engine.dispose()
             raise ConfigurationError(problems)
 
+        approval = self._approval or StaticApprovalPolicy(ApprovalRule(s.approval, s.require_test))
         governance = GovernanceEngine(uow=uow_factory, store=store, source=s.service, clock=self._clock,
-                                      maker_checker_policy=True)
+                                      policy=approval)
         operations = OperationRunner(uow=uow_factory, store=op_store, source=s.service, clock=self._clock)
         for k in self._kinds:
             governance.register(k)

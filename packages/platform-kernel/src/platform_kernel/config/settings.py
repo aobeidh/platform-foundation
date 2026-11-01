@@ -36,6 +36,8 @@ class PlatformSettings(BaseModel):
     allow_demo: bool = False
     egress_allowlist: tuple[str, ...] = ()
     expression_language: str = "jsonata"
+    approval: Literal["auto", "single", "maker_checker"] = "maker_checker"  # default rule for governed kinds (P14)
+    require_test: bool = True
 
     @classmethod
     def from_env(cls, service: str, env: dict[str, str] | None = None, **overrides: object) -> PlatformSettings:
@@ -49,12 +51,15 @@ class PlatformSettings(BaseModel):
             "MAX_BODY_BYTES": "max_body_bytes",
             "IDEMPOTENCY_RETENTION_HOURS": "idempotency_retention_hours",
             "EXPRESSION_LANGUAGE": "expression_language",
+            "APPROVAL": "approval",
         }
         for key, field in simple.items():
             if key in env:
                 values[field] = env[key]
         if env.get("ALLOW_DEMO", "").lower() in {"1", "true", "yes"}:
             values["allow_demo"] = True
+        if "REQUIRE_TEST" in env:
+            values["require_test"] = env["REQUIRE_TEST"].lower() in {"1", "true", "yes"}
         if env.get("EGRESS_ALLOWLIST"):
             values["egress_allowlist"] = tuple(h.strip() for h in env["EGRESS_ALLOWLIST"].split(",") if h.strip())
         values["providers"] = {k[len("PROVIDER_"):].lower(): v for k, v in env.items() if k.startswith("PROVIDER_")}

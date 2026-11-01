@@ -44,12 +44,14 @@ interface Caller { subject: string; roles: string[]; tenant: string | null; plat
 const STATUS: Record<string, number> = {
   VALIDATION_FAILED: 422, UNAUTHENTICATED: 401, TOKEN_INVALID: 401, FORBIDDEN: 403, NOT_FOUND: 404, REVISION_CONFLICT: 409,
   INVALID_TRANSITION: 409, MAKER_CHECKER: 403, NOT_TESTED: 409, PLUGIN_NOT_FOUND: 404, CONNECTION_NOT_ACTIVE: 409, CONFLICT: 409,
+  NO_DRAFT: 409, DRAFT_SUBMITTED: 409, NOT_SUBMITTED: 409, NOT_ACTIVE: 409, NOT_PAUSED: 409, RECORD_RETIRED: 409,
 };
 const TITLE: Record<string, string> = {
   VALIDATION_FAILED: 'Validation failed', UNAUTHENTICATED: 'Authentication required', TOKEN_INVALID: 'Token not valid',
   FORBIDDEN: 'Not allowed', NOT_FOUND: 'Not found', REVISION_CONFLICT: 'Revision conflict', INVALID_TRANSITION: 'Transition not allowed',
   MAKER_CHECKER: 'Second person required', NOT_TESTED: 'Test required', PLUGIN_NOT_FOUND: 'Plugin not found',
-  CONNECTION_NOT_ACTIVE: 'Connection not active', CONFLICT: 'Conflict',
+  CONNECTION_NOT_ACTIVE: 'Connection not active', CONFLICT: 'Conflict', NO_DRAFT: 'No draft', DRAFT_SUBMITTED: 'Waiting for approval',
+  NOT_SUBMITTED: 'Nothing to approve', NOT_ACTIVE: 'Not active', NOT_PAUSED: 'Not paused', RECORD_RETIRED: 'Retired',
 };
 
 class Fail extends Error {
@@ -273,7 +275,7 @@ export class SimulatedTransport implements Transport {
       const stored: SimStoredRecord = {
         record: { id, kind: kind.kind, tenant: c.tenant, status: 'draft', revision: 1, currentVersion: 1, activeVersion: null, createdAt: now, updatedAt: now },
         versions: [{ version: 1, status: 'draft', spec, createdBy: c.subject, submittedBy: null, approvedBy: null, testResult: null,
-          editedBy: [c.subject], makerChecker: kind.makerChecker !== 'never', createdAt: now }],
+          editedBy: [c.subject], makerChecker: (kind.approval ?? 'maker_checker') === 'maker_checker', createdAt: now, testedBy: null, testedAt: null, reason: null }],
       };
       this.state.records.push(stored);
       return this.respond(stored, 201);
@@ -294,67 +296,86 @@ export class SimulatedTransport implements Transport {
     const spec = method === 'PUT' && seg[1] === 'draft' ? this.validateSpec(kind, body.spec) : null;
     const expected = this.revision(req);
     const r = stored.record;
-    if (r.status === 'retired') throw new Fail('INVALID_TRANSITION', `${kind.kind} ${r.id} is retired; it cannot change.`);
+    if (r.status === 'retired') throw new Fail('RECORD_RETIRED', `${kind.kind} ${r.id} is retired; it cannot change.`);
     if (r.revision !== expected) throw new Fail('REVISION_CONFLICT', `${kind.kind} ${r.id} is at revision ${r.revision}, not ${expected}. Reload and try again.`);
     const cur = stored.versions.find((v) => v.version === r.currentVersion)!;
     const setStatus = (s: RecordStatus) => { r.status = s; };
+    const pending = cur.status === 'draft' || cur.status === 'tested' || cur.status === 'returned';
+    const rule = { approval: kind.approval ?? 'maker_checker', requireTest: kind.requireTest ?? true };
+    const activate = (actor: string) => {
+      if (r.activeVersion && r.activeVersion !== cur.version) {
+        const prev = stored.versions.find((v) => v.version === r.activeVersion);
+        if (prev) prev.status = 'superseded';
+      }
+      cur.status = 'active'; cur.approvedBy = actor; r.activeVersion = cur.version;
+      setStatus(r.status === 'paused' ? 'paused' : 'active');
+      this.state.activations.push({ connectionId: r.id, version: cur.version, tenant: r.tenant, activatedAt: now, eventId: simId() });
+    };
 
     switch (method === 'PUT' ? 'draft' : seg[1]) {
       case 'draft': {
-        if (cur.status === 'submitted') throw new Fail('INVALID_TRANSITION', 'The version is waiting for approval. Reject it first.');
-        if (cur.status === 'draft' || cur.status === 'tested') {
-          Object.assign(cur, { spec: spec!, status: 'draft', testResult: null, editedBy: cur.editedBy.includes(c.subject) ? cur.editedBy : [...cur.editedBy, c.subject] });
+        if (cur.status === 'submitted') throw new Fail('DRAFT_SUBMITTED', 'The version is waiting for approval. It can change once it is returned.');
+        if (pending) {
+          Object.assign(cur, { spec: spec!, status: 'draft', testResult: null, testedBy: null, testedAt: null, reason: null,
+            editedBy: cur.editedBy.includes(c.subject) ? cur.editedBy : [...cur.editedBy, c.subject] });
         } else {
-          const v = r.currentVersion + 1;
+          const v = Math.max(...stored.versions.map((x) => x.version)) + 1; // after every version, discarded ones included
           stored.versions.push({ version: v, status: 'draft', spec: spec!, createdBy: c.subject, submittedBy: null, approvedBy: null,
-            testResult: null, editedBy: [c.subject], makerChecker: kind.makerChecker !== 'never', createdAt: now });
+            testResult: null, editedBy: [c.subject], makerChecker: rule.approval === 'maker_checker', createdAt: now, testedBy: null, testedAt: null, reason: null });
           r.currentVersion = v;
         }
         break;
       }
       case 'test': {
-        if (cur.status !== 'draft' && cur.status !== 'tested') throw new Fail('INVALID_TRANSITION', `Only a draft can be tested; this one is ${cur.status}.`);
+        if (cur.status === 'submitted') throw new Fail('DRAFT_SUBMITTED', 'The version is waiting for approval; it cannot be tested now.');
+        if (!pending) throw new Fail('NO_DRAFT', 'There is no draft to test.');
         const checks = this.runTests(cur.spec);
-        cur.testResult = checks;
-        cur.status = checks.every((x) => x.ok) ? 'tested' : 'draft';
+        Object.assign(cur, { testResult: checks, status: checks.every((x) => x.ok) ? 'tested' : 'draft', testedBy: c.subject, testedAt: now, reason: null });
         break;
       }
       case 'submit':
-        if (cur.status !== 'tested') throw new Fail('NOT_TESTED', 'Run the test and fix any failed checks before submitting.');
-        cur.status = 'submitted'; cur.submittedBy = c.subject;
+        if (cur.status === 'submitted') throw new Fail('DRAFT_SUBMITTED', 'The version is already submitted.');
+        if (!pending) throw new Fail('NO_DRAFT', 'There is no draft to submit.');
+        if (rule.requireTest && cur.status !== 'tested') throw new Fail('NOT_TESTED', 'Run the test and fix any failed checks before submitting.');
+        if (cur.testResult?.some((x) => !x.ok)) throw new Fail('NOT_TESTED', 'The last test failed. Fix the draft and test it again.');
+        Object.assign(cur, { status: 'submitted', submittedBy: c.subject, reason: null, makerChecker: rule.approval === 'maker_checker' });
+        if (rule.approval === 'auto') activate(c.subject);
         break;
       case 'approve': {
-        if (cur.status !== 'submitted') throw new Fail('INVALID_TRANSITION', `Only a submitted version can be approved; this one is ${cur.status}.`);
+        if (cur.status !== 'submitted') throw new Fail('NOT_SUBMITTED', 'Nothing is waiting for approval.');
+        if (cur.testResult?.some((x) => !x.ok) || (rule.requireTest && cur.testResult == null)) throw new Fail('NOT_TESTED', 'This version has no passing test, which approval now needs.');
+        const strict = cur.makerChecker || rule.approval === 'maker_checker';
         const authors = new Set([cur.createdBy, ...cur.editedBy, ...(cur.submittedBy ? [cur.submittedBy] : [])]);
-        if (cur.makerChecker && authors.has(c.subject)) throw new Fail('MAKER_CHECKER', 'Someone who did not create, edit or submit this version must approve it.');
-        if (r.activeVersion && r.activeVersion !== cur.version) {
-          const prev = stored.versions.find((v) => v.version === r.activeVersion);
-          if (prev) prev.status = 'superseded';
-        }
-        cur.status = 'active'; cur.approvedBy = c.subject; r.activeVersion = cur.version;
-        setStatus(r.status === 'paused' ? 'paused' : 'active');
-        this.state.activations.push({ connectionId: r.id, version: cur.version, tenant: r.tenant, activatedAt: now, eventId: simId() });
+        if (strict && authors.has(c.subject)) throw new Fail('MAKER_CHECKER', 'Someone who did not create, edit or submit this version must approve it.');
+        cur.makerChecker = strict;
+        activate(c.subject);
         break;
       }
       case 'reject':
         if (typeof body.reason !== 'string' || !body.reason || body.reason.length > 500) throw new Fail('VALIDATION_FAILED', 'The request is not valid.', [{ pointer: '/reason', code: 'missing', message: 'Field required' }]);
-        if (cur.status !== 'submitted') throw new Fail('INVALID_TRANSITION', 'Only a submitted version can be rejected.');
-        Object.assign(cur, { status: 'draft', submittedBy: null, testResult: null });
+        if (cur.status !== 'submitted') throw new Fail('NOT_SUBMITTED', 'Nothing is waiting for approval.');
+        Object.assign(cur, { status: 'returned', submittedBy: null, testResult: null, testedBy: null, testedAt: null, reason: body.reason });
         break;
       case 'pause':
-        if (r.status !== 'active') throw new Fail('INVALID_TRANSITION', `Only an active record can be paused; it is ${r.status}.`);
+        if (r.status !== 'active') throw new Fail('NOT_ACTIVE', `Only an active record can be paused; it is ${r.status}.`);
         setStatus('paused');
         break;
       case 'resume':
-        if (r.status !== 'paused') throw new Fail('INVALID_TRANSITION', `Only a paused record can be resumed; it is ${r.status}.`);
+        if (r.status !== 'paused') throw new Fail('NOT_PAUSED', `Only a paused record can be resumed; it is ${r.status}.`);
         setStatus('active');
         break;
       case 'retire': {
         if (r.activeVersion) { const a = stored.versions.find((v) => v.version === r.activeVersion); if (a) a.status = 'retired'; }
-        if (cur.version !== r.activeVersion && ['draft', 'tested', 'submitted'].includes(cur.status)) cur.status = 'retired';
+        if (cur.version !== r.activeVersion && (pending || cur.status === 'submitted')) cur.status = 'retired';
         setStatus('retired');
         break;
       }
+      case 'discard':
+        if (cur.status === 'submitted') throw new Fail('DRAFT_SUBMITTED', 'The version is waiting for approval. Ask the approver to return it first.');
+        if (!pending) throw new Fail('NO_DRAFT', 'There is no draft to discard.');
+        cur.status = 'discarded';
+        if (r.activeVersion) r.currentVersion = r.activeVersion; else setStatus('retired');
+        break;
       default:
         throw new Fail('NOT_FOUND', 'Not found.');
     }
