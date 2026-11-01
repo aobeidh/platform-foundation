@@ -8,6 +8,8 @@
     pk check migrations      destructive SQL needs an explicit, reasoned marker (P32)
     pk check guides          every kernel module has its one-page guide (F20)
     pk update contracts|spec regenerate committed files after a reviewed change
+    pk scaffold service NAME [--dir services]
+    pk scaffold plugin NAME --kind KIND --group ENTRY_POINT_GROUP [--dir plugins]
 """
 from __future__ import annotations
 
@@ -211,8 +213,31 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("names", nargs="*", metavar="check", help=", ".join(CHECKS))
     u = sub.add_parser("update", help="regenerate committed contracts or spec after review")
     u.add_argument("what", choices=["contracts", "spec"])
+    sc = sub.add_parser("scaffold", help="create a service or plugin that passes every check (F14)")
+    sc_sub = sc.add_subparsers(dest="what", required=True)
+    svc = sc_sub.add_parser("service")
+    svc.add_argument("name")
+    svc.add_argument("--dir", default="services")
+    plg = sc_sub.add_parser("plugin")
+    plg.add_argument("name")
+    plg.add_argument("--kind", required=True)
+    plg.add_argument("--group", required=True)
+    plg.add_argument("--dir", default="plugins")
     args = parser.parse_args(argv)
     root = find_root(Path.cwd())
+    if args.command == "scaffold":
+        from .scaffold import ScaffoldError, scaffold_plugin, scaffold_service
+
+        try:
+            if args.what == "service":
+                target = scaffold_service(root, args.name, args.dir)
+            else:
+                target = scaffold_plugin(root, args.name, args.kind, args.group, args.dir)
+        except ScaffoldError as exc:
+            print(f"pk: {exc}")
+            return 1
+        print(f"pk: created {target.relative_to(root)}. Next: uv sync, then pk check and pytest.")
+        return 0
     if args.command == "update":
         CHECKS[args.what](root, True)
         return 0

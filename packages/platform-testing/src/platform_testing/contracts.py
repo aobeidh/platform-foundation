@@ -102,3 +102,32 @@ class IdempotencyStoreContract:
         idempotency_store.begin("t1", "k4", "h1")
         idempotency_store.abandon("t1", "k4")
         assert idempotency_store.begin("t1", "k4", "h1").outcome == "started"
+
+
+class ExpressionEngineContract:
+    """Needs fixtures: engine (an ExpressionEngine) and cases (the parsed conformance file for its language)."""
+
+    def test_conformance_cases(self, engine, cases):
+        failures = []
+        for case in cases["cases"]:
+            compiled = engine.compile(case["expr"])
+            if not compiled.ok:
+                outcome = ("error", compiled.error.code)
+            else:
+                result = engine.evaluate(compiled.value, case["input"], case.get("bindings"))
+                outcome = ("value", result.value) if result.ok else ("error", result.error.code)
+            expected = ("error", case["error"]) if "error" in case else ("value", case["expected"])
+            if outcome != expected:
+                failures.append(f"{case['name']}: expected {expected}, got {outcome}")
+        assert not failures, "\n".join(failures)
+
+    def test_schema_check_refuses_unknown_fields_when_closed(self, engine):
+        schema = {"type": "object", "properties": {"order": {}}, "additionalProperties": False}
+        assert engine.compile("order.id", schema).ok
+        assert engine.compile("customer.id", schema).error.code == "EXPRESSION_INVALID"
+
+    def test_output_size_limit(self, engine):
+        from platform_kernel.expressions import Limits
+
+        compiled = engine.compile("$pad(\"\", 2000, \"x\")").value
+        assert engine.evaluate(compiled, {}, limits=Limits(max_output_bytes=100)).error.code == "EXPRESSION_LIMIT"

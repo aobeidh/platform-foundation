@@ -1,6 +1,6 @@
 [project]
 name = "platform-kernel"
-version = "0.1.0"
+version = "0.2.0"
 description = "Platform kernel: layered modules with ports, providers and contract suites."
 requires-python = ">=3.12"
 dependencies = [
@@ -13,8 +13,9 @@ dependencies = [
   "opentelemetry-api>=1.27",
   "jsonschema>=4.23",
   "packaging>=24.0",
-  "pyjwt>=2.9",
+  "pyjwt[crypto]>=2.9",
   "pyyaml>=6.0",
+  "jsonata-python>=0.5",
 ]
 
 [project.optional-dependencies]

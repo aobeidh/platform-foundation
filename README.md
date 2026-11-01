@@ -5,7 +5,7 @@ The shared foundation that enterprise products are built on. It makes the rules 
 contracts, governed configuration, tenant isolation, an outbox, idempotency, audit, resilience and plugins by default
 instead of rebuilding them.
 
-**Status: milestone 0.1, a walking skeleton.** Every layer exists, thin but complete, and is proven end to end by an
+**Status: milestone 0.2.** Every layer exists, thin but complete, and is proven end to end by an
 exemplar service on both in-memory providers and PostgreSQL. Pre-1.0 versions may change their API between minor
 releases (F1).
 
@@ -20,7 +20,8 @@ releases (F1).
 | `exemplar/` | A reference service (`connections`) and plugin (`echo`) that use every module (F15). |
 
 Kernel modules, lowest first: `core`, `contracts`, `config`, `context`, `identity`, `policy`, `tenancy`, `audit`,
-`observability`, `errors`, `persistence`, `messaging`, `http`, `plugins`, `governance`, `platform`. Each has a
+`observability`, `errors`, `expressions`, `persistence`, `messaging`, `http`, `plugins`, `operations`,
+`governance`, `platform`. Each has a
 one-page guide in [docs/modules](docs/modules).
 
 ## Interfaces, providers and plugins
@@ -55,6 +56,14 @@ ALLOW_DEMO=true uv run uvicorn exemplar_connections.main:app --reload
 curl -H "Authorization: Bearer demo:ada:integration-admin:t1" localhost:8000/api/v1/connections
 ```
 
+## Create a service or plugin
+
+```bash
+uv run pk scaffold service billing                       # services/billing, passes every check at once
+uv run pk scaffold plugin acme-sftp --kind connector --group hub.connectors
+uv sync && uv run pk check && uv run pytest
+```
+
 ## Building a product on the foundation
 
 ```python
@@ -73,17 +82,24 @@ app = platform.create_app([product_router])          # fixed middleware stack (F
 
 See [exemplar/service/src/exemplar_connections/wiring.py](exemplar/service/src/exemplar_connections/wiring.py).
 
-## Milestone 0.1 scope
+## Milestones
+
+**0.2:** the expression engine port with a JSONata provider, OIDC identity with token exchange, long-running
+operations and sagas, and the scaffolder.
+
+**0.1 scope:**
 
 In: core, contracts, config, context, identity, policy, tenancy, audit, observability, errors, persistence (memory and
 PostgreSQL), messaging (polling relay, local transport), http, plugins, governance, the builder, the testing kit,
 `pk check`, and the exemplar.
 
-Later milestones: broker transports, operations and sagas, configuration overlays and promotion bundles, the
-expression engine port and its providers ([ADR 0001](docs/adr/0001-expression-engine-as-port.md)), AI, the web kit,
-the scaffolder, Sigstore plugin signatures, out-of-process plugin isolation, JWKS discovery and token exchange.
+Later milestones: broker transports and competing relays, configuration overlays and promotion bundles, a FEEL
+provider for the expression engine, Temporal behind the orchestrator port, AI, the web kit, Sigstore plugin
+signatures, out-of-process plugin isolation, and OpenID discovery.
 
 ## Decisions
 
 - [ADR 0001](docs/adr/0001-expression-engine-as-port.md): the expression language is a port with providers.
 - [ADR 0002](docs/adr/0002-kernel-layers.md): kernel layers as built, and the plugin SDK at the bottom.
+- [ADR 0003](docs/adr/0003-identity-and-token-exchange.md): OIDC identity, and token exchange between services.
+- [ADR 0004](docs/adr/0004-operations-and-sagas.md): long-running operations and sagas on an in-process orchestrator.

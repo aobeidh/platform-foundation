@@ -21,9 +21,11 @@ class JwtTokenVerifier:
     simulated = False
 
     def __init__(self, key: Any, *, algorithms: list[str], audience: str, issuer: str,
-                 roles_claim: str = "roles", tenant_claim: str = "tenant", leeway_seconds: int = 30) -> None:
+                 roles_claim: str = "roles", tenant_claim: str = "tenant", leeway_seconds: int = 30,
+                 platform_roles: frozenset[str] = frozenset()) -> None:
         self._key, self._alg, self._aud, self._iss = key, algorithms, audience, issuer
         self._roles, self._tenant, self._leeway = roles_claim, tenant_claim, leeway_seconds
+        self._platform_roles = frozenset(platform_roles)
 
     def verify(self, token: str) -> Result[Principal, DomainError]:
         try:
@@ -34,10 +36,13 @@ class JwtTokenVerifier:
         except jwt.PyJWTError as exc:
             return Err(DomainError("TOKEN_INVALID", f"The access token is not valid: {exc}."))
         roles = claims.get(self._roles) or []
+        role_set = frozenset(roles if isinstance(roles, list) else [roles])
+        if not claims.get(self._tenant) and not (role_set & self._platform_roles):
+            return Err(DomainError("TOKEN_INVALID", "The token has no tenant claim and no platform role."))
         return Ok(Principal(
             subject=str(claims["sub"]),
-            roles=frozenset(roles if isinstance(roles, list) else [roles]),
-            tenant=claims.get(self._tenant),
+            roles=role_set,
+            tenant=claims.get(self._tenant) or None,
             kind=claims.get("kind", "user"),
             on_behalf_of=claims.get("act", {}).get("sub") if isinstance(claims.get("act"), dict) else None,
             claims=claims,

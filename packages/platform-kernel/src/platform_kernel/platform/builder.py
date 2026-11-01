@@ -13,11 +13,13 @@ from fastapi import APIRouter, FastAPI
 from ..config import MemorySecretStore, PlatformSettings, SecretStore, UnknownProvider
 from ..core import Clock, SystemClock
 from ..errors import ErrorCatalog, kernel_catalog
+from ..expressions import ExpressionEngine, ExpressionRegistry, JsonataEngine
 from ..governance import GovernanceEngine, GovernedKind, MemoryGovernedStore, PostgresGovernedStore, governed_router
-from ..http import Authorizer, EgressPolicy, HttpSettings, ResilientClient, create_app
-from ..identity import DemoTokenVerifier, TokenVerifier
+from ..http import Authorizer, EgressPolicy, HttpSettings, OAuthTokenService, ResilientClient, create_app
+from ..identity import CachedJwksSource, DemoTokenVerifier, OidcTokenVerifier, TokenVerifier
 from ..messaging import ConsumerRuntime, LocalTransport, PollingRelay
 from ..observability import get_logger
+from ..operations import MemoryOperationStore, OperationRunner, PostgresOperationStore, operations_router
 from ..persistence import (
     IdempotencyStore,
     MemoryIdempotencyStore,
@@ -67,7 +69,10 @@ class Platform:
     governance: GovernanceEngine
     consumers: ConsumerRuntime
     relay: PollingRelay
+    expressions: ExpressionRegistry
+    operations: OperationRunner
     simulated: list[str]
+    tokens: OAuthTokenService | None = None
     _plugin_hosts: dict[str, PluginHost] = field(default_factory=dict)
     _migrations: list[Path] = field(default_factory=list)
     _engine: Any = None
@@ -88,6 +93,32 @@ class Platform:
     def http_client(self, name: str, base_url: str, **kwargs: Any) -> ResilientClient:
         return ResilientClient(name, base_url, egress=self.egress, **kwargs)
 
+    def service_client(self, name: str, base_url: str, audience: str, *, acting: str = "caller",
+                       **kwargs: Any) -> ResilientClient:
+        """A client for another service (P36). `acting="caller"` exchanges the caller's token so the callee sees
+        the user (RFC 8693) and fails closed when there is no caller token (background work, public routes).
+        `acting="service"` uses the service's own client-credentials token."""
+        if self.tokens is None:
+            raise RuntimeError("service_client needs with_oauth(...) on the builder")
+        if acting not in ("caller", "service"):
+            raise ValueError("acting must be 'caller' or 'service'")
+        tokens = self.tokens
+
+        def auth() -> str:
+            from .. import context as ctxmod
+            from ..core import DomainError
+            from ..http import OutboundError
+
+            if acting == "service":
+                return tokens.token(audience)
+            ctx = ctxmod.maybe_current()
+            if ctx is None or not ctx.token:
+                raise OutboundError(DomainError("FORBIDDEN", f"No caller token to act for when calling {name}; use "
+                                                             f"acting='service' for work the service does itself."))
+            return tokens.exchange(ctx.token, audience)
+
+        return ResilientClient(name, base_url, egress=self.egress, auth=auth, **kwargs)
+
     def plugin_context(self) -> _PluginContext:
         """One context, one egress-bound client, one breaker and bulkhead for all plugin calls (P12, P26)."""
         if self._plugin_ctx is None:
@@ -100,7 +131,8 @@ class Platform:
 
     def create_app(self, routers: Iterable[APIRouter] = (), *, include_governed: bool = True,
                    readiness: dict[str, Callable[[], bool]] | None = None, version: str = "0.1.0") -> FastAPI:
-        all_routers = list(routers) + (self.governed_routers() if include_governed else [])
+        all_routers = (list(routers) + (self.governed_routers() if include_governed else [])
+                       + [operations_router(self.operations)])
         probes = dict(readiness or {})
         if self._engine is not None:
             probes.setdefault("database", self._database_ready)
@@ -128,6 +160,7 @@ class Platform:
             return c.execute(text("select 1")).scalar() == 1
 
     def close(self) -> None:
+        self.operations.close()
         for host in self._plugin_hosts.values():
             host.close()
         if self._plugin_ctx is not None:
@@ -154,6 +187,9 @@ class PlatformBuilder:
         self._providers: dict[str, dict[str, Callable[[Platform], Any]]] = {}
         self._defaults: dict[str, str] = {}
         self._egress: EgressPolicy | None = None
+        self._expression_engines: list[ExpressionEngine] = []
+        self._oidc: dict[str, Any] | None = None
+        self._oauth: dict[str, Any] | None = None
 
     # Configuration ----------------------------------------------------------------------------------------------
 
@@ -200,6 +236,25 @@ class PlatformBuilder:
         self._plugin_kinds.append(_PluginKind(kind, spi, spi_version, discover_group))
         return self
 
+    def with_expressions(self, *engines: ExpressionEngine) -> PlatformBuilder:
+        """Add expression languages (ADR 0001). JSONata is always available; EXPRESSION_LANGUAGE picks the default."""
+        self._expression_engines.extend(engines)
+        return self
+
+    def with_oidc(self, *, issuer: str, audience: str, jwks_url: str, algorithms: tuple[str, ...] = ("RS256",),
+                  roles_claim: str = "roles", tenant_claim: str = "tenant",
+                  platform_roles: frozenset[str] = frozenset()) -> PlatformBuilder:
+        """Verify bearer tokens from an OIDC provider; keys come from its JWKS endpoint through the egress policy.
+        Tokens without a tenant claim are refused unless they carry one of `platform_roles` (staff)."""
+        self._oidc = {"issuer": issuer, "audience": audience, "jwks_url": jwks_url, "algorithms": algorithms,
+                      "roles_claim": roles_claim, "tenant_claim": tenant_claim, "platform_roles": platform_roles}
+        return self
+
+    def with_oauth(self, *, token_url: str, client_id: str, client_secret_ref: str) -> PlatformBuilder:
+        """Service tokens (client credentials) and token exchange, for calls to other services (P36)."""
+        self._oauth = {"token_url": token_url, "client_id": client_id, "secret_ref": client_secret_ref}
+        return self
+
     def with_signature_verifier(self, verifier: SignatureVerifier) -> PlatformBuilder:
         self._signature = verifier
         return self
@@ -229,11 +284,13 @@ class PlatformBuilder:
             idem: IdempotencyStore = MemoryIdempotencyStore(
                 uow_factory.db, timedelta(hours=s.idempotency_retention_hours))
             store: Any = MemoryGovernedStore()
+            op_store: Any = MemoryOperationStore()
             simulated.append("persistence")
         elif persistence == "postgres":
             if not s.database_url:
                 problems.append("PROVIDER_PERSISTENCE=postgres needs DATABASE_URL")
                 uow_factory, outbox, idem, store = MemoryUnitOfWorkFactory(), None, None, None  # type: ignore[assignment]
+                op_store = None
             else:
                 from ..persistence.postgres import (
                     PostgresIdempotencyStore,
@@ -248,10 +305,27 @@ class PlatformBuilder:
                 outbox = PostgresOutboxReader(engine, schema)
                 idem = PostgresIdempotencyStore(engine, schema, timedelta(hours=s.idempotency_retention_hours))
                 store = PostgresGovernedStore()
+                op_store = PostgresOperationStore()
         else:
             problems.append(str(UnknownProvider("persistence", persistence, ["memory", "postgres"])))
             uow_factory, outbox, idem, store = MemoryUnitOfWorkFactory(), None, None, None  # type: ignore[assignment]
+            op_store = None
 
+        egress = self._egress or EgressPolicy(allowlist=s.egress_allowlist)
+        if self._oidc is not None and self._verifier is None:
+            from urllib.parse import urlsplit
+
+            o = self._oidc
+            jwks_host = urlsplit(o["jwks_url"]).hostname or ""
+            if not EgressPolicy._match(jwks_host, egress.allowlist):
+                problems.append(f"the JWKS host {jwks_host!r} is not on the egress allowlist (EGRESS_ALLOWLIST)")
+            jwks_url = o["jwks_url"]
+            jwks_client = ResilientClient("jwks", jwks_url, egress=egress)
+            self._verifier = OidcTokenVerifier(
+                CachedJwksSource(lambda: jwks_client.request("GET", jwks_url).json()),
+                issuer=o["issuer"], audience=o["audience"], algorithms=o["algorithms"],
+                roles_claim=o["roles_claim"], tenant_claim=o["tenant_claim"],
+                platform_roles=frozenset(o["platform_roles"]))
         verifier = self._verifier
         if verifier is None:
             if s.allow_demo:
@@ -274,6 +348,21 @@ class PlatformBuilder:
         secrets = self._secrets or MemorySecretStore()
         if getattr(secrets, "simulated", False):
             simulated.append("secrets")
+        tokens = None
+        if self._oauth is not None:
+            oauth = self._oauth
+            secret_ref = oauth["secret_ref"]
+            token_client = ResilientClient("oauth", oauth["token_url"], egress=egress)
+            tokens = OAuthTokenService(token_client, oauth["token_url"], oauth["client_id"],
+                                       lambda: secrets.resolve(secret_ref))
+
+        engines = [JsonataEngine(), *self._expression_engines]
+        language = getattr(s, "expression_language", None) or "jsonata"
+        try:
+            expressions = ExpressionRegistry(engines, default=language)
+        except ValueError as exc:
+            problems.append(str(exc))
+            expressions = ExpressionRegistry([JsonataEngine()], default="jsonata")
 
         signature = self._signature or AllowUnsignedVerifier()
         if self._plugin_kinds and getattr(signature, "simulated", False):
@@ -306,6 +395,7 @@ class PlatformBuilder:
 
         governance = GovernanceEngine(uow=uow_factory, store=store, source=s.service, clock=self._clock,
                                       maker_checker_policy=True)
+        operations = OperationRunner(uow=uow_factory, store=op_store, source=s.service, clock=self._clock)
         for k in self._kinds:
             governance.register(k)
         consumers = ConsumerRuntime(uow_factory)
@@ -313,9 +403,9 @@ class PlatformBuilder:
         platform = Platform(
             settings=s, clock=self._clock, errors=self._errors, uow=uow_factory, outbox=outbox, idempotency=idem,
             verifier=verifier, policy=policy, authz=Authorizer(policy), secrets=secrets,
-            egress=self._egress or EgressPolicy(allowlist=s.egress_allowlist), governance=governance,
-            consumers=consumers, relay=relay, simulated=sorted(set(simulated)), _migrations=list(self._migrations),
-            _engine=engine)
+            egress=egress, governance=governance,
+            consumers=consumers, relay=relay, expressions=expressions, operations=operations,
+            simulated=sorted(set(simulated)), tokens=tokens, _migrations=list(self._migrations), _engine=engine)
         for pk in self._plugin_kinds:
             host = PluginHost(pk.kind, pk.spi_version, pk.spi, signature)
             if pk.group:

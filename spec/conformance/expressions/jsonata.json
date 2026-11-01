@@ -1,0 +1,19 @@
+{
+  "language": "jsonata",
+  "description": "Conformance cases every JSONata provider must pass (F19). error is the expected DomainError code.",
+  "cases": [
+    {"name": "path", "expr": "order.id", "input": {"order": {"id": "A1"}}, "expected": "A1"},
+    {"name": "filter and map", "expr": "items[price > 2].name", "input": {"items": [{"name": "a", "price": 1}, {"name": "b", "price": 5}]}, "expected": "b"},
+    {"name": "sum", "expr": "$sum(items.price)", "input": {"items": [{"price": 1.5}, {"price": 2.5}]}, "expected": 4},
+    {"name": "object construction", "expr": "{\"ref\": id, \"total\": $sum(lines.amount)}", "input": {"id": "X", "lines": [{"amount": 2}, {"amount": 3}]}, "expected": {"ref": "X", "total": 5}},
+    {"name": "conditional", "expr": "amount > 100 ? \"high\" : \"normal\"", "input": {"amount": 150}, "expected": "high"},
+    {"name": "string functions", "expr": "$uppercase($substring(name, 0, 3))", "input": {"name": "riyadh"}, "expected": "RIY"},
+    {"name": "binding", "expr": "$rate * amount", "input": {"amount": 10}, "bindings": {"rate": 1.15}, "expected": 11.5},
+    {"name": "missing field is undefined", "expr": "nothing", "input": {"a": 1}, "expected": null},
+    {"name": "arabic text", "expr": "$length(name)", "input": {"name": "الرياض"}, "expected": 6},
+    {"name": "syntax error", "expr": "order.(", "input": {}, "error": "EXPRESSION_INVALID"},
+    {"name": "runtime error", "expr": "$number(\"abc\")", "input": {}, "error": "EXPRESSION_FAILED"},
+    {"name": "runaway recursion", "expr": "($f := function($n){ $f($n + 1) }; $f(0))", "input": {}, "error": "EXPRESSION_LIMIT"},
+    {"name": "regex refused by default", "expr": "$match(\"aaa\", /a+/)", "input": {}, "error": "EXPRESSION_INVALID"}
+  ]
+}

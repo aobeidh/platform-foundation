@@ -1,6 +1,6 @@
 [project]
 name = "exemplar-echo-connector"
-version = "0.1.0"
+version = "0.2.0"
 description = "Exemplar connector plugin, packaged exactly like a third-party plugin."
 requires-python = ">=3.12"
 dependencies = ["platform-plugin-sdk"]

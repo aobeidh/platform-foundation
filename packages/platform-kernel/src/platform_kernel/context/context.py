@@ -58,6 +58,7 @@ class RequestContext:
     traceparent: str | None = None
     idempotency_key: str | None = None
     test: bool = False
+    token: str | None = field(default=None, repr=False, compare=False)  # the caller's bearer token, for exchange
 
     def with_tenant(self, scope: TenantScope) -> RequestContext:
         return replace(self, tenant=scope)
