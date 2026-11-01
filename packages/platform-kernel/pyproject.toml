@@ -1,6 +1,6 @@
 [project]
 name = "platform-kernel"
-version = "0.2.0"
+version = "0.3.0"
 description = "Platform kernel: layered modules with ports, providers and contract suites."
 requires-python = ">=3.12"
 dependencies = [

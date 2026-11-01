@@ -61,5 +61,6 @@ def build(settings: PlatformSettings | None = None, *, discover_plugins: bool = 
     repo = platform.provider("activations")
     platform.consumers.subscribe(f"{SERVICE}.connection.approved.v1", "record-activation", RecordActivation(repo))
     app = platform.create_app([router(SendThroughConnection(platform.governance, host, platform.plugin_context),
-                                      ListActivations(repo, platform.uow), platform.authz)])
+                                      ListActivations(repo, platform.uow), platform.authz,
+                                      platform.operations)])
     return platform, app

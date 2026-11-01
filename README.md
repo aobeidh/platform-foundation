@@ -18,6 +18,7 @@ releases (F1).
 | `platform-testing` | Contract suites every provider must pass, and PostgreSQL test helpers. |
 | `platform-tools` | `pk`, the one command that runs every architecture and contract check, locally and in CI. |
 | `exemplar/` | A reference service (`connections`) and plugin (`echo`) that use every module (F15). |
+| `web/` | `@platform/web-kit`: the portal kit (atomic design system, ECharts, API port, governed-record screens) and the exemplar portal. See [web/README.md](web/README.md). |
 
 Kernel modules, lowest first: `core`, `contracts`, `config`, `context`, `identity`, `policy`, `tenancy`, `audit`,
 `observability`, `errors`, `expressions`, `persistence`, `messaging`, `http`, `plugins`, `operations`,
@@ -56,6 +57,14 @@ ALLOW_DEMO=true uv run uvicorn exemplar_connections.main:app --reload
 curl -H "Authorization: Bearer demo:ada:integration-admin:t1" localhost:8000/api/v1/connections
 ```
 
+Run the portal against it (in another terminal):
+
+```bash
+cd web && npm ci && API_MODE=http npm run dev   # http://localhost:5173, /api proxied to :8000
+```
+
+Without a service, `npm run dev` falls back to the simulated provider.
+
 ## Create a service or plugin
 
 ```bash
@@ -84,6 +93,9 @@ See [exemplar/service/src/exemplar_connections/wiring.py](exemplar/service/src/e
 
 ## Milestones
 
+**0.3:** the portal kit (`@platform/web-kit`) and the exemplar portal, the kernel's portal API, and an
+operation in the exemplar.
+
 **0.2:** the expression engine port with a JSONata provider, OIDC identity with token exchange, long-running
 operations and sagas, and the scaffolder.
 
@@ -94,7 +106,7 @@ PostgreSQL), messaging (polling relay, local transport), http, plugins, governan
 `pk check`, and the exemplar.
 
 Later milestones: broker transports and competing relays, configuration overlays and promotion bundles, a FEEL
-provider for the expression engine, Temporal behind the orchestrator port, AI, the web kit, Sigstore plugin
+provider for the expression engine, Temporal behind the orchestrator port, AI, Sigstore plugin
 signatures, out-of-process plugin isolation, and OpenID discovery.
 
 ## Decisions
@@ -103,3 +115,4 @@ signatures, out-of-process plugin isolation, and OpenID discovery.
 - [ADR 0002](docs/adr/0002-kernel-layers.md): kernel layers as built, and the plugin SDK at the bottom.
 - [ADR 0003](docs/adr/0003-identity-and-token-exchange.md): OIDC identity, and token exchange between services.
 - [ADR 0004](docs/adr/0004-operations-and-sagas.md): long-running operations and sagas on an in-process orchestrator.
+- [ADR 0005](docs/adr/0005-web-kit.md): the portal kit, the portal API, and the API as a port in the browser.

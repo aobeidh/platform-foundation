@@ -14,6 +14,9 @@ class OperationStore(Protocol):
         ...
     def save(self, uow: Any, op: Operation) -> None: ...
     def unfinished(self, uow: Any) -> list[Operation]: ...
+    def recent(self, uow: Any, limit: int) -> list[Operation]:
+        """Newest first, within the unit of work's tenant scope (row-level security in PostgreSQL)."""
+        ...
 
 
 class MemoryOperationStore:
@@ -27,6 +30,16 @@ class MemoryOperationStore:
 
     def save(self, uow: Any, op: Operation) -> None:
         uow.table("operation")[op.id] = op
+
+    def recent(self, uow: Any, limit: int) -> list[Operation]:
+        ops = sorted(uow.table("operation").values(), key=lambda o: o.created_at, reverse=True)
+        scope = getattr(uow, "platform_scope", False)
+        from .. import context as ctxmod
+
+        ctx = ctxmod.maybe_current()
+        if not scope and ctx is not None and not ctx.tenant.platform:
+            ops = [o for o in ops if o.tenant == ctx.tenant.tenant]
+        return ops[:limit]
 
     def unfinished(self, uow: Any) -> list[Operation]:
         return sorted((o for o in uow.table("operation").values() if o.status in RESUMABLE),
@@ -83,4 +96,10 @@ class PostgresOperationStore:
 
         rows = uow.connection.execute(text("select * from operation where status in ('pending', 'running', 'stalled') "
                                            "order by created_at"))
+        return [_row(r) for r in rows]
+
+    def recent(self, uow: Any, limit: int) -> list[Operation]:
+        from sqlalchemy import text
+
+        rows = uow.connection.execute(text("select * from operation order by created_at desc limit :n"), {"n": limit})
         return [_row(r) for r in rows]

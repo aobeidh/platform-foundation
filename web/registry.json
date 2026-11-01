@@ -1,0 +1,1405 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "platform",
+  "homepage": "https://github.com/aobeidh/platform-foundation/tree/main/web",
+  "items": [
+    {
+      "name": "theme",
+      "type": "registry:style",
+      "title": "theme",
+      "description": "@platform/web-kit theme (styles/tokens.css, styles/globals.css)",
+      "dependencies": [
+        "@fontsource-variable/geist@5.3.0",
+        "@fontsource/ibm-plex-sans-arabic@5.3.0",
+        "tw-animate-css@1.4.0"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "src/styles/tokens.css",
+          "type": "registry:file",
+          "target": "src/styles/tokens.css"
+        },
+        {
+          "path": "src/styles/globals.css",
+          "type": "registry:file",
+          "target": "src/styles/globals.css"
+        }
+      ]
+    },
+    {
+      "name": "utils",
+      "type": "registry:ui",
+      "title": "utils",
+      "description": "@platform/web-kit utils (lib/utils.ts)",
+      "dependencies": [
+        "clsx@2.1.1",
+        "tailwind-merge@3.7.0"
+      ],
+      "registryDependencies": [
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/lib/utils.ts",
+          "type": "registry:file",
+          "target": "src/lib/utils.ts"
+        }
+      ]
+    },
+    {
+      "name": "format",
+      "type": "registry:ui",
+      "title": "format",
+      "description": "@platform/web-kit format (lib/format.ts)",
+      "dependencies": [],
+      "registryDependencies": [
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/lib/format.ts",
+          "type": "registry:file",
+          "target": "src/lib/format.ts"
+        }
+      ]
+    },
+    {
+      "name": "prefs",
+      "type": "registry:ui",
+      "title": "prefs",
+      "description": "@platform/web-kit prefs (lib/prefs.tsx)",
+      "dependencies": [
+        "radix-ui@1.8.1",
+        "react-i18next@15.7.4",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/format",
+        "@platform/i18n",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/lib/prefs.tsx",
+          "type": "registry:file",
+          "target": "src/lib/prefs.tsx"
+        }
+      ]
+    },
+    {
+      "name": "i18n",
+      "type": "registry:ui",
+      "title": "i18n",
+      "description": "@platform/web-kit i18n (i18n/index.ts, i18n/strings.ts)",
+      "dependencies": [
+        "i18next@24.2.3",
+        "react-i18next@15.7.4"
+      ],
+      "registryDependencies": [
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/i18n/index.ts",
+          "type": "registry:file",
+          "target": "src/i18n/index.ts"
+        },
+        {
+          "path": "src/i18n/strings.ts",
+          "type": "registry:file",
+          "target": "src/i18n/strings.ts"
+        }
+      ]
+    },
+    {
+      "name": "echart",
+      "type": "registry:ui",
+      "title": "echart",
+      "description": "@platform/web-kit echart (ui/charts/echarts.ts, ui/charts/theme.ts, ui/charts/tooltip.ts, ui/charts/echart.tsx)",
+      "dependencies": [
+        "echarts@5.6.0",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/charts/echarts.ts",
+          "type": "registry:file",
+          "target": "src/ui/charts/echarts.ts"
+        },
+        {
+          "path": "src/ui/charts/theme.ts",
+          "type": "registry:file",
+          "target": "src/ui/charts/theme.ts"
+        },
+        {
+          "path": "src/ui/charts/tooltip.ts",
+          "type": "registry:file",
+          "target": "src/ui/charts/tooltip.ts"
+        },
+        {
+          "path": "src/ui/charts/echart.tsx",
+          "type": "registry:file",
+          "target": "src/ui/charts/echart.tsx"
+        }
+      ]
+    },
+    {
+      "name": "viz-utils",
+      "type": "registry:ui",
+      "title": "viz-utils",
+      "description": "@platform/web-kit viz-utils (ui/viz/use-width.ts)",
+      "dependencies": [
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/viz/use-width.ts",
+          "type": "registry:file",
+          "target": "src/ui/viz/use-width.ts"
+        }
+      ]
+    },
+    {
+      "name": "api-kit",
+      "type": "registry:ui",
+      "title": "api-kit",
+      "description": "@platform/web-kit api-kit (kit/api/client.ts, kit/api/hooks.ts, kit/api/http-transport.ts, kit/api/identity.ts, kit/api/index.ts, kit/api/provider.tsx, kit/api/transport.ts, kit/api/types.ts, kit/api/simulated/server.ts)",
+      "dependencies": [
+        "@tanstack/react-query@5.105.1",
+        "ajv@8.20.0",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/kit/api/client.ts",
+          "type": "registry:file",
+          "target": "src/kit/api/client.ts"
+        },
+        {
+          "path": "src/kit/api/hooks.ts",
+          "type": "registry:file",
+          "target": "src/kit/api/hooks.ts"
+        },
+        {
+          "path": "src/kit/api/http-transport.ts",
+          "type": "registry:file",
+          "target": "src/kit/api/http-transport.ts"
+        },
+        {
+          "path": "src/kit/api/identity.ts",
+          "type": "registry:file",
+          "target": "src/kit/api/identity.ts"
+        },
+        {
+          "path": "src/kit/api/index.ts",
+          "type": "registry:file",
+          "target": "src/kit/api/index.ts"
+        },
+        {
+          "path": "src/kit/api/provider.tsx",
+          "type": "registry:file",
+          "target": "src/kit/api/provider.tsx"
+        },
+        {
+          "path": "src/kit/api/transport.ts",
+          "type": "registry:file",
+          "target": "src/kit/api/transport.ts"
+        },
+        {
+          "path": "src/kit/api/types.ts",
+          "type": "registry:file",
+          "target": "src/kit/api/types.ts"
+        },
+        {
+          "path": "src/kit/api/simulated/server.ts",
+          "type": "registry:file",
+          "target": "src/kit/api/simulated/server.ts"
+        }
+      ]
+    },
+    {
+      "name": "governed-kit",
+      "type": "registry:ui",
+      "title": "governed-kit",
+      "description": "@platform/web-kit governed-kit (kit/governed/governed-actions.tsx, kit/governed/identity-switcher.tsx, kit/governed/index.ts, kit/governed/lifecycle-gates.tsx, kit/governed/operation-progress.tsx, kit/governed/problem.tsx, kit/governed/schema-fields.tsx, kit/governed/schema.ts)",
+      "dependencies": [
+        "lucide-react@1.66.0",
+        "react-hook-form@7.91.0",
+        "react-i18next@15.7.4",
+        "react@19.3.1",
+        "zod@3.25.76"
+      ],
+      "registryDependencies": [
+        "@platform/api-kit",
+        "@platform/avatar",
+        "@platform/button",
+        "@platform/dialog",
+        "@platform/form",
+        "@platform/format",
+        "@platform/i18n",
+        "@platform/input",
+        "@platform/pipeline-gates",
+        "@platform/popover",
+        "@platform/select",
+        "@platform/status-pill",
+        "@platform/switch",
+        "@platform/textarea",
+        "@platform/theme",
+        "@platform/tooltip",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/kit/governed/governed-actions.tsx",
+          "type": "registry:file",
+          "target": "src/kit/governed/governed-actions.tsx"
+        },
+        {
+          "path": "src/kit/governed/identity-switcher.tsx",
+          "type": "registry:file",
+          "target": "src/kit/governed/identity-switcher.tsx"
+        },
+        {
+          "path": "src/kit/governed/index.ts",
+          "type": "registry:file",
+          "target": "src/kit/governed/index.ts"
+        },
+        {
+          "path": "src/kit/governed/lifecycle-gates.tsx",
+          "type": "registry:file",
+          "target": "src/kit/governed/lifecycle-gates.tsx"
+        },
+        {
+          "path": "src/kit/governed/operation-progress.tsx",
+          "type": "registry:file",
+          "target": "src/kit/governed/operation-progress.tsx"
+        },
+        {
+          "path": "src/kit/governed/problem.tsx",
+          "type": "registry:file",
+          "target": "src/kit/governed/problem.tsx"
+        },
+        {
+          "path": "src/kit/governed/schema-fields.tsx",
+          "type": "registry:file",
+          "target": "src/kit/governed/schema-fields.tsx"
+        },
+        {
+          "path": "src/kit/governed/schema.ts",
+          "type": "registry:file",
+          "target": "src/kit/governed/schema.ts"
+        }
+      ]
+    },
+    {
+      "name": "avatar",
+      "type": "registry:ui",
+      "title": "avatar",
+      "description": "@platform/web-kit avatar (ui/atoms/avatar.tsx)",
+      "dependencies": [
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/avatar.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/avatar.tsx"
+        }
+      ]
+    },
+    {
+      "name": "badge",
+      "type": "registry:ui",
+      "title": "badge",
+      "description": "@platform/web-kit badge (ui/atoms/badge.tsx)",
+      "dependencies": [
+        "class-variance-authority@0.7.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/badge.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/badge.tsx"
+        }
+      ]
+    },
+    {
+      "name": "button",
+      "type": "registry:ui",
+      "title": "button",
+      "description": "@platform/web-kit button (ui/atoms/button.tsx)",
+      "dependencies": [
+        "class-variance-authority@0.7.1",
+        "lucide-react@1.66.0",
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/button.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/button.tsx"
+        }
+      ]
+    },
+    {
+      "name": "card",
+      "type": "registry:ui",
+      "title": "card",
+      "description": "@platform/web-kit card (ui/atoms/card.tsx)",
+      "dependencies": [
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/card.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/card.tsx"
+        }
+      ]
+    },
+    {
+      "name": "checkbox",
+      "type": "registry:ui",
+      "title": "checkbox",
+      "description": "@platform/web-kit checkbox (ui/atoms/checkbox.tsx)",
+      "dependencies": [
+        "lucide-react@1.66.0",
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/checkbox.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/checkbox.tsx"
+        }
+      ]
+    },
+    {
+      "name": "command",
+      "type": "registry:ui",
+      "title": "command",
+      "description": "@platform/web-kit command (ui/atoms/command.tsx)",
+      "dependencies": [
+        "cmdk@1.1.1",
+        "lucide-react@1.66.0",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/dialog",
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/command.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/command.tsx"
+        }
+      ]
+    },
+    {
+      "name": "dialog",
+      "type": "registry:ui",
+      "title": "dialog",
+      "description": "@platform/web-kit dialog (ui/atoms/dialog.tsx)",
+      "dependencies": [
+        "lucide-react@1.66.0",
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/button",
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/dialog.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/dialog.tsx"
+        }
+      ]
+    },
+    {
+      "name": "form",
+      "type": "registry:ui",
+      "title": "form",
+      "description": "@platform/web-kit form (ui/atoms/form.tsx)",
+      "dependencies": [
+        "radix-ui@1.8.1",
+        "react-hook-form@7.91.0",
+        "react-i18next@15.7.4",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/i18n",
+        "@platform/label",
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/form.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/form.tsx"
+        }
+      ]
+    },
+    {
+      "name": "input",
+      "type": "registry:ui",
+      "title": "input",
+      "description": "@platform/web-kit input (ui/atoms/input.tsx)",
+      "dependencies": [
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/input.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/input.tsx"
+        }
+      ]
+    },
+    {
+      "name": "label",
+      "type": "registry:ui",
+      "title": "label",
+      "description": "@platform/web-kit label (ui/atoms/label.tsx)",
+      "dependencies": [
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/label.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/label.tsx"
+        }
+      ]
+    },
+    {
+      "name": "misc",
+      "type": "registry:ui",
+      "title": "misc",
+      "description": "@platform/web-kit misc (ui/atoms/misc.tsx)",
+      "dependencies": [
+        "lucide-react@1.66.0"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/misc.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/misc.tsx"
+        }
+      ]
+    },
+    {
+      "name": "popover",
+      "type": "registry:ui",
+      "title": "popover",
+      "description": "@platform/web-kit popover (ui/atoms/popover.tsx)",
+      "dependencies": [
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/popover.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/popover.tsx"
+        }
+      ]
+    },
+    {
+      "name": "scroll-area",
+      "type": "registry:ui",
+      "title": "scroll-area",
+      "description": "@platform/web-kit scroll-area (ui/atoms/scroll-area.tsx)",
+      "dependencies": [
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/scroll-area.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/scroll-area.tsx"
+        }
+      ]
+    },
+    {
+      "name": "segmented",
+      "type": "registry:ui",
+      "title": "segmented",
+      "description": "@platform/web-kit segmented (ui/atoms/segmented.tsx)",
+      "dependencies": [
+        "radix-ui@1.8.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/segmented.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/segmented.tsx"
+        }
+      ]
+    },
+    {
+      "name": "select",
+      "type": "registry:ui",
+      "title": "select",
+      "description": "@platform/web-kit select (ui/atoms/select.tsx)",
+      "dependencies": [
+        "lucide-react@1.66.0",
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/select.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/select.tsx"
+        }
+      ]
+    },
+    {
+      "name": "separator",
+      "type": "registry:ui",
+      "title": "separator",
+      "description": "@platform/web-kit separator (ui/atoms/separator.tsx)",
+      "dependencies": [
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/separator.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/separator.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sheet",
+      "type": "registry:ui",
+      "title": "sheet",
+      "description": "@platform/web-kit sheet (ui/atoms/sheet.tsx)",
+      "dependencies": [
+        "lucide-react@1.66.0",
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/sheet.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/sheet.tsx"
+        }
+      ]
+    },
+    {
+      "name": "skeleton",
+      "type": "registry:ui",
+      "title": "skeleton",
+      "description": "@platform/web-kit skeleton (ui/atoms/skeleton.tsx)",
+      "dependencies": [
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/skeleton.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/skeleton.tsx"
+        }
+      ]
+    },
+    {
+      "name": "slider",
+      "type": "registry:ui",
+      "title": "slider",
+      "description": "@platform/web-kit slider (ui/atoms/slider.tsx)",
+      "dependencies": [
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/slider.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/slider.tsx"
+        }
+      ]
+    },
+    {
+      "name": "status-pill",
+      "type": "registry:ui",
+      "title": "status-pill",
+      "description": "@platform/web-kit status-pill (ui/atoms/status-pill.tsx)",
+      "dependencies": [
+        "react-i18next@15.7.4"
+      ],
+      "registryDependencies": [
+        "@platform/badge",
+        "@platform/i18n",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/status-pill.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/status-pill.tsx"
+        }
+      ]
+    },
+    {
+      "name": "style-chip",
+      "type": "registry:ui",
+      "title": "style-chip",
+      "description": "@platform/web-kit style-chip (ui/atoms/style-chip.tsx)",
+      "dependencies": [
+        "react-i18next@15.7.4"
+      ],
+      "registryDependencies": [
+        "@platform/i18n",
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/style-chip.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/style-chip.tsx"
+        }
+      ]
+    },
+    {
+      "name": "switch",
+      "type": "registry:ui",
+      "title": "switch",
+      "description": "@platform/web-kit switch (ui/atoms/switch.tsx)",
+      "dependencies": [
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/switch.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/switch.tsx"
+        }
+      ]
+    },
+    {
+      "name": "table",
+      "type": "registry:ui",
+      "title": "table",
+      "description": "@platform/web-kit table (ui/atoms/table.tsx)",
+      "dependencies": [
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/table.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/table.tsx"
+        }
+      ]
+    },
+    {
+      "name": "tabs",
+      "type": "registry:ui",
+      "title": "tabs",
+      "description": "@platform/web-kit tabs (ui/atoms/tabs.tsx)",
+      "dependencies": [
+        "class-variance-authority@0.7.1",
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/tabs.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/tabs.tsx"
+        }
+      ]
+    },
+    {
+      "name": "textarea",
+      "type": "registry:ui",
+      "title": "textarea",
+      "description": "@platform/web-kit textarea (ui/atoms/textarea.tsx)",
+      "dependencies": [
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/input",
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/textarea.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/textarea.tsx"
+        }
+      ]
+    },
+    {
+      "name": "toggle-group",
+      "type": "registry:ui",
+      "title": "toggle-group",
+      "description": "@platform/web-kit toggle-group (ui/atoms/toggle-group.tsx)",
+      "dependencies": [
+        "class-variance-authority@0.7.1",
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/toggle",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/toggle-group.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/toggle-group.tsx"
+        }
+      ]
+    },
+    {
+      "name": "toggle",
+      "type": "registry:ui",
+      "title": "toggle",
+      "description": "@platform/web-kit toggle (ui/atoms/toggle.tsx)",
+      "dependencies": [
+        "class-variance-authority@0.7.1",
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/toggle.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/toggle.tsx"
+        }
+      ]
+    },
+    {
+      "name": "tooltip",
+      "type": "registry:ui",
+      "title": "tooltip",
+      "description": "@platform/web-kit tooltip (ui/atoms/tooltip.tsx)",
+      "dependencies": [
+        "radix-ui@1.8.1",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/atoms/tooltip.tsx",
+          "type": "registry:file",
+          "target": "src/ui/atoms/tooltip.tsx"
+        }
+      ]
+    },
+    {
+      "name": "form-field",
+      "type": "registry:ui",
+      "title": "form-field",
+      "description": "@platform/web-kit form-field (ui/molecules/form-field.tsx)",
+      "dependencies": [
+        "react-hook-form@7.91.0"
+      ],
+      "registryDependencies": [
+        "@platform/form",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/molecules/form-field.tsx",
+          "type": "registry:file",
+          "target": "src/ui/molecules/form-field.tsx"
+        }
+      ]
+    },
+    {
+      "name": "kpi-tile",
+      "type": "registry:ui",
+      "title": "kpi-tile",
+      "description": "@platform/web-kit kpi-tile (ui/molecules/kpi-tile.tsx)",
+      "dependencies": [],
+      "registryDependencies": [
+        "@platform/misc",
+        "@platform/skeleton",
+        "@platform/sparkline",
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/molecules/kpi-tile.tsx",
+          "type": "registry:file",
+          "target": "src/ui/molecules/kpi-tile.tsx"
+        }
+      ]
+    },
+    {
+      "name": "nav-item",
+      "type": "registry:ui",
+      "title": "nav-item",
+      "description": "@platform/web-kit nav-item (ui/molecules/nav-item.tsx)",
+      "dependencies": [
+        "react-router-dom@6.30.6"
+      ],
+      "registryDependencies": [
+        "@platform/misc",
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/molecules/nav-item.tsx",
+          "type": "registry:file",
+          "target": "src/ui/molecules/nav-item.tsx"
+        }
+      ]
+    },
+    {
+      "name": "samples",
+      "type": "registry:ui",
+      "title": "samples",
+      "description": "@platform/web-kit samples (ui/molecules/samples.tsx)",
+      "dependencies": [],
+      "registryDependencies": [
+        "@platform/misc",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/molecules/samples.tsx",
+          "type": "registry:file",
+          "target": "src/ui/molecules/samples.tsx"
+        }
+      ]
+    },
+    {
+      "name": "search-box",
+      "type": "registry:ui",
+      "title": "search-box",
+      "description": "@platform/web-kit search-box (ui/molecules/search-box.tsx)",
+      "dependencies": [
+        "lucide-react@1.66.0",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/input",
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/molecules/search-box.tsx",
+          "type": "registry:file",
+          "target": "src/ui/molecules/search-box.tsx"
+        }
+      ]
+    },
+    {
+      "name": "states",
+      "type": "registry:ui",
+      "title": "states",
+      "description": "@platform/web-kit states (ui/molecules/states.tsx)",
+      "dependencies": [
+        "lucide-react@1.66.0",
+        "react-i18next@15.7.4"
+      ],
+      "registryDependencies": [
+        "@platform/button",
+        "@platform/i18n",
+        "@platform/skeleton",
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/molecules/states.tsx",
+          "type": "registry:file",
+          "target": "src/ui/molecules/states.tsx"
+        }
+      ]
+    },
+    {
+      "name": "tab-bar",
+      "type": "registry:ui",
+      "title": "tab-bar",
+      "description": "@platform/web-kit tab-bar (ui/molecules/tab-bar.tsx)",
+      "dependencies": [
+        "react-router-dom@6.30.6"
+      ],
+      "registryDependencies": [
+        "@platform/misc",
+        "@platform/tabs",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/molecules/tab-bar.tsx",
+          "type": "registry:file",
+          "target": "src/ui/molecules/tab-bar.tsx"
+        }
+      ]
+    },
+    {
+      "name": "chart-card",
+      "type": "registry:ui",
+      "title": "chart-card",
+      "description": "@platform/web-kit chart-card (ui/organisms/chart-card.tsx)",
+      "dependencies": [
+        "lucide-react@1.66.0",
+        "react-i18next@15.7.4",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/button",
+        "@platform/card",
+        "@platform/i18n",
+        "@platform/skeleton",
+        "@platform/theme",
+        "@platform/tooltip",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/organisms/chart-card.tsx",
+          "type": "registry:file",
+          "target": "src/ui/organisms/chart-card.tsx"
+        }
+      ]
+    },
+    {
+      "name": "command-palette",
+      "type": "registry:ui",
+      "title": "command-palette",
+      "description": "@platform/web-kit command-palette (ui/organisms/command-palette.tsx)",
+      "dependencies": [
+        "react-i18next@15.7.4",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/command",
+        "@platform/i18n",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/organisms/command-palette.tsx",
+          "type": "registry:file",
+          "target": "src/ui/organisms/command-palette.tsx"
+        }
+      ]
+    },
+    {
+      "name": "data-table",
+      "type": "registry:ui",
+      "title": "data-table",
+      "description": "@platform/web-kit data-table (ui/organisms/data-table.tsx)",
+      "dependencies": [
+        "@tanstack/react-table@8.21.3",
+        "lucide-react@1.66.0",
+        "react-i18next@15.7.4",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/button",
+        "@platform/i18n",
+        "@platform/search-box",
+        "@platform/states",
+        "@platform/table",
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/organisms/data-table.tsx",
+          "type": "registry:file",
+          "target": "src/ui/organisms/data-table.tsx"
+        }
+      ]
+    },
+    {
+      "name": "shell",
+      "type": "registry:ui",
+      "title": "shell",
+      "description": "@platform/web-kit shell (ui/organisms/shell.tsx)",
+      "dependencies": [
+        "lucide-react@1.66.0",
+        "react-i18next@15.7.4",
+        "react-router-dom@6.30.6",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/button",
+        "@platform/i18n",
+        "@platform/misc",
+        "@platform/nav-item",
+        "@platform/prefs",
+        "@platform/sheet",
+        "@platform/theme",
+        "@platform/tooltip",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/organisms/shell.tsx",
+          "type": "registry:file",
+          "target": "src/ui/organisms/shell.tsx"
+        }
+      ]
+    },
+    {
+      "name": "area-chart",
+      "type": "registry:ui",
+      "title": "area-chart",
+      "description": "@platform/web-kit area-chart (ui/charts/area-chart.tsx)",
+      "dependencies": [
+        "echarts@5.6.0",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/echart",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/charts/area-chart.tsx",
+          "type": "registry:file",
+          "target": "src/ui/charts/area-chart.tsx"
+        }
+      ]
+    },
+    {
+      "name": "bar-chart",
+      "type": "registry:ui",
+      "title": "bar-chart",
+      "description": "@platform/web-kit bar-chart (ui/charts/bar-chart.tsx)",
+      "dependencies": [
+        "echarts@5.6.0",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/echart",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/charts/bar-chart.tsx",
+          "type": "registry:file",
+          "target": "src/ui/charts/bar-chart.tsx"
+        }
+      ]
+    },
+    {
+      "name": "donut-chart",
+      "type": "registry:ui",
+      "title": "donut-chart",
+      "description": "@platform/web-kit donut-chart (ui/charts/donut-chart.tsx)",
+      "dependencies": [
+        "echarts@5.6.0",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/echart",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/charts/donut-chart.tsx",
+          "type": "registry:file",
+          "target": "src/ui/charts/donut-chart.tsx"
+        }
+      ]
+    },
+    {
+      "name": "fan-chart",
+      "type": "registry:ui",
+      "title": "fan-chart",
+      "description": "@platform/web-kit fan-chart (ui/charts/fan-chart.tsx)",
+      "dependencies": [
+        "echarts@5.6.0",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/echart",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/charts/fan-chart.tsx",
+          "type": "registry:file",
+          "target": "src/ui/charts/fan-chart.tsx"
+        }
+      ]
+    },
+    {
+      "name": "heatmap-chart",
+      "type": "registry:ui",
+      "title": "heatmap-chart",
+      "description": "@platform/web-kit heatmap-chart (ui/charts/heatmap-chart.tsx)",
+      "dependencies": [
+        "echarts@5.6.0",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/echart",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/charts/heatmap-chart.tsx",
+          "type": "registry:file",
+          "target": "src/ui/charts/heatmap-chart.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sparkline",
+      "type": "registry:ui",
+      "title": "sparkline",
+      "description": "@platform/web-kit sparkline (ui/charts/sparkline.tsx)",
+      "dependencies": [
+        "echarts@5.6.0",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/echart",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/charts/sparkline.tsx",
+          "type": "registry:file",
+          "target": "src/ui/charts/sparkline.tsx"
+        }
+      ]
+    },
+    {
+      "name": "lineage-graph",
+      "type": "registry:ui",
+      "title": "lineage-graph",
+      "description": "@platform/web-kit lineage-graph (ui/viz/lineage-graph.tsx)",
+      "dependencies": [
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils",
+        "@platform/viz-utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/viz/lineage-graph.tsx",
+          "type": "registry:file",
+          "target": "src/ui/viz/lineage-graph.tsx"
+        }
+      ]
+    },
+    {
+      "name": "pipeline-gates",
+      "type": "registry:ui",
+      "title": "pipeline-gates",
+      "description": "@platform/web-kit pipeline-gates (ui/viz/pipeline-gates.tsx)",
+      "dependencies": [
+        "lucide-react@1.66.0"
+      ],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils",
+        "@platform/viz-utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/viz/pipeline-gates.tsx",
+          "type": "registry:file",
+          "target": "src/ui/viz/pipeline-gates.tsx"
+        }
+      ]
+    },
+    {
+      "name": "ranked-bars",
+      "type": "registry:ui",
+      "title": "ranked-bars",
+      "description": "@platform/web-kit ranked-bars (ui/viz/ranked-bars.tsx)",
+      "dependencies": [],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils",
+        "@platform/viz-utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/viz/ranked-bars.tsx",
+          "type": "registry:file",
+          "target": "src/ui/viz/ranked-bars.tsx"
+        }
+      ]
+    },
+    {
+      "name": "app-shell",
+      "type": "registry:ui",
+      "title": "app-shell",
+      "description": "@platform/web-kit app-shell (ui/templates/app-shell.tsx)",
+      "dependencies": [
+        "react-i18next@15.7.4",
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/command-palette",
+        "@platform/i18n",
+        "@platform/shell",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/templates/app-shell.tsx",
+          "type": "registry:file",
+          "target": "src/ui/templates/app-shell.tsx"
+        }
+      ]
+    },
+    {
+      "name": "page-header",
+      "type": "registry:ui",
+      "title": "page-header",
+      "description": "@platform/web-kit page-header (ui/templates/page-header.tsx)",
+      "dependencies": [],
+      "registryDependencies": [
+        "@platform/misc",
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/ui/templates/page-header.tsx",
+          "type": "registry:file",
+          "target": "src/ui/templates/page-header.tsx"
+        }
+      ]
+    },
+    {
+      "name": "section",
+      "type": "registry:ui",
+      "title": "section",
+      "description": "@platform/web-kit section (ui/templates/section.tsx)",
+      "dependencies": [],
+      "registryDependencies": [
+        "@platform/theme",
+        "@platform/utils"
+      ],
+      "files": [
+        {
+          "path": "src/ui/templates/section.tsx",
+          "type": "registry:file",
+          "target": "src/ui/templates/section.tsx"
+        }
+      ]
+    }
+  ]
+}

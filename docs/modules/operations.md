@@ -6,7 +6,7 @@
 
 **Do not use it when:** The work finishes well within the request deadline; answer directly.
 
-**Ports and API:** `OperationRunner` (register, register_saga, start, get, cancel, resume_unfinished), `Handle` (progress, save_state, check_cancelled), `Saga`, `SagaStep`, `SagaStalled`, `accepted()`, `operations_router`, `Orchestrator` port. Statuses: pending, running, stalled, succeeded, failed, cancelled.
+**Ports and API:** `OperationRunner` (register, register_saga, start, get, recent, cancel, resume_unfinished; `GET /operations` lists what the caller may see), `Handle` (progress, save_state, check_cancelled), `Saga`, `SagaStep`, `SagaStalled`, `accepted()`, `operations_router`, `Orchestrator` port. Statuses: pending, running, stalled, succeeded, failed, cancelled.
 
 **Providers:** In-process runner with `MemoryOperationStore` or `PostgresOperationStore` (table `operation`, row-level security). Temporal is a later provider behind `Orchestrator`.
 

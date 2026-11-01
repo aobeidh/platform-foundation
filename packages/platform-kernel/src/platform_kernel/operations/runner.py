@@ -146,6 +146,12 @@ class OperationRunner:
         assert op is not None
         return Ok(op)
 
+    def recent(self, limit: int = 50) -> list[Operation]:
+        """Operations the caller may see, newest first."""
+        with self._uow() as uow:
+            ops = self._store.recent(uow, max(1, min(limit, 200)) * 4)
+        return [o for o in ops if self._visible(o)][:limit]
+
     def cancel(self, id: str) -> Result[Operation, DomainError]:
         ctx = ctxmod.current()
         with self._uow() as uow:

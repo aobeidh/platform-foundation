@@ -26,6 +26,11 @@ def operations_router(runner: OperationRunner, prefix: str = "/api/v1") -> APIRo
             raise DomainException(result.error)
         return result.value.to_json()
 
+    @r.get("", summary="Long-running operations the caller may see, newest first")
+    def list_operations(limit: int = 50) -> dict:
+        items = [op.to_json() for op in runner.recent(limit)]
+        return {"items": items, "total": len(items)}
+
     @r.get("/{id}", summary="Status, progress, result or error of a long-running operation")
     def get(id: str) -> dict:
         return unwrap(runner.get(id))
