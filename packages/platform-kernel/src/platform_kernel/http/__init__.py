@@ -2,8 +2,9 @@
 from .app import DomainException, HttpSettings, PlatformMiddleware, create_app, problem_response
 from .authz import Authorizer
 from .client import CircuitBreaker, EgressPolicy, OutboundError, ResilientClient, Retry
+from .oauth import OAuthTokenService
 
 __all__ = [
-    "Authorizer", "CircuitBreaker", "DomainException", "EgressPolicy", "HttpSettings", "OutboundError",
-    "PlatformMiddleware", "ResilientClient", "Retry", "create_app", "problem_response",
+    "Authorizer", "CircuitBreaker", "DomainException", "EgressPolicy", "HttpSettings", "OAuthTokenService",
+    "OutboundError", "PlatformMiddleware", "ResilientClient", "Retry", "create_app", "problem_response",
 ]

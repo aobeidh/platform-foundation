@@ -6,7 +6,7 @@
 
 **Do not use it when:** You want to add your own authentication or error format; the stack is fixed on purpose.
 
-**Ports and API:** `create_app`, `Authorizer.require(capability)`, `DomainException`, `ResilientClient`, `EgressPolicy`.
+**Ports and API:** `create_app`, `Authorizer.require(capability)`, `DomainException`, `ResilientClient`, `EgressPolicy`, `OAuthTokenService` (client credentials and RFC 8693 token exchange, cached until shortly before expiry, never keyed by the raw token).
 
 **Providers:** Stack order: correlation id, tracing, deadline (`Request-Deadline` header, capped by settings), body limit, authentication, tenant scope, idempotency (`Idempotency-Key` on unsafe methods), problem details, metrics. Simulated providers are listed in `X-Platform-Simulated`.
 

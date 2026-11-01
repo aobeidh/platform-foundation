@@ -35,6 +35,7 @@ class PlatformSettings(BaseModel):
     idempotency_retention_hours: int = 24
     allow_demo: bool = False
     egress_allowlist: tuple[str, ...] = ()
+    expression_language: str = "jsonata"
 
     @classmethod
     def from_env(cls, service: str, env: dict[str, str] | None = None, **overrides: object) -> PlatformSettings:
@@ -47,6 +48,7 @@ class PlatformSettings(BaseModel):
             "REQUEST_TIMEOUT_SECONDS": "request_timeout_seconds",
             "MAX_BODY_BYTES": "max_body_bytes",
             "IDEMPOTENCY_RETENTION_HOURS": "idempotency_retention_hours",
+            "EXPRESSION_LANGUAGE": "expression_language",
         }
         for key, field in simple.items():
             if key in env:

@@ -1,6 +1,6 @@
 [project]
 name = "exemplar-connections"
-version = "0.1.0"
+version = "0.2.0"
 description = "Exemplar service that uses every kernel module (F15)."
 requires-python = ">=3.12"
 dependencies = ["platform-kernel", "platform-plugin-sdk"]

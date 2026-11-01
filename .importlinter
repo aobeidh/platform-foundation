@@ -11,10 +11,10 @@ type = layers
 containers = platform_kernel
 layers =
     platform
-    governance
+    operations | governance
     messaging | http | plugins
     persistence
-    identity | policy | tenancy | audit | observability | errors
+    identity | policy | tenancy | audit | observability | errors | expressions
     contracts | config | context
     core
 

@@ -175,7 +175,8 @@ class PlatformMiddleware:
                 await self._send_problem(send, DomainError("UNAUTHENTICATED", "Send a bearer token."), correlation_id,
                                          {"www-authenticate": "Bearer"})
                 return
-            verified = self.verifier.verify(auth[7:].strip())
+            # Verification may fetch keys over the network; keep it off the event loop.
+            verified = await anyio.to_thread.run_sync(self.verifier.verify, auth[7:].strip())
             if not verified.ok:
                 await self._send_problem(send, verified.error, correlation_id, {"www-authenticate": "Bearer"})
                 return
@@ -184,7 +185,8 @@ class PlatformMiddleware:
         scope_ = TenantScope.resolve(principal, headers.get("x-tenant-id"))
         ctx = RequestContext(principal=principal, tenant=scope_, correlation_id=correlation_id, deadline=deadline,
                              traceparent=headers.get("traceparent"), idempotency_key=headers.get("idempotency-key"),
-                             test=headers.get("x-test-message", "").lower() == "true")
+                             test=headers.get("x-test-message", "").lower() == "true",
+                             token=None if public else headers.get("authorization", "")[7:].strip())
         with ctxmod.use(ctx):
             # 7 idempotency for unsafe methods
             client_key = headers.get("idempotency-key")

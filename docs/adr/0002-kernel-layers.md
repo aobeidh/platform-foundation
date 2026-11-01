@@ -20,10 +20,10 @@ The kernel layers, enforced by `.importlinter`:
 | Layer | Modules |
 |---|---|
 | 6 | `platform` |
-| 5 | `governance` |
+| 5 | `operations`, `governance` (independent; added in 0.2: `operations`) |
 | 4 | `messaging`, `http`, `plugins` (independent of each other) |
 | 3 | `persistence` |
-| 2 | `identity`, `policy`, `tenancy`, `audit`, `observability`, `errors` (independent) |
+| 2 | `identity`, `policy`, `tenancy`, `audit`, `observability`, `errors`, `expressions` (independent; `expressions` added in 0.2) |
 | 1 | `contracts`, `config`, `context` (independent) |
 | 0 | `core` |
 

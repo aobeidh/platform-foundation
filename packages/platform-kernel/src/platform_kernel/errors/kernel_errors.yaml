@@ -19,3 +19,7 @@ MAKER_CHECKER:         {status: 403, retryable: false, title: Second person requ
 NOT_TESTED:            {status: 409, retryable: false, title: Test required, remedy: Run the test and fix any failed checks before submitting.}
 PLUGIN_NOT_FOUND:      {status: 404, retryable: false, title: Plugin not found, remedy: Check the plugin id and version, or install the plugin.}
 PLUGIN_FAILED:         {status: 502, retryable: true,  title: Plugin failed, remedy: Check the plugin's configuration and logs.}
+EXPRESSION_INVALID:    {status: 422, retryable: false, title: Expression not valid, remedy: Correct the expression; the detail names the problem.}
+EXPRESSION_FAILED:     {status: 422, retryable: false, title: Expression failed, remedy: Check the expression against the input data.}
+EXPRESSION_LIMIT:      {status: 422, retryable: false, title: Expression limit reached, remedy: Simplify the expression or raise its limits.}
+EXPRESSION_LANGUAGE_UNKNOWN: {status: 422, retryable: false, title: Expression language unknown, remedy: Use a configured language.}

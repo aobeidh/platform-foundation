@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.2.0 (unreleased)
+
+### platform-kernel
+- Added `expressions` (layer 2): the `ExpressionEngine` port from ADR 0001, an `ExpressionRegistry` that runs
+  languages side by side, and a JSONata provider with schema-checked compilation and limits on time, depth, steps
+  and output size. Regular expressions are opt-in. Conformance cases in `spec/conformance/expressions/`.
+- Added OIDC identity (ADR 0003): `OidcTokenVerifier` with a rate-limited JWKS cache, `OAuthTokenService` for client
+  credentials and RFC 8693 token exchange, and `platform.service_client()` that calls onward as the user.
+- Added `operations` (layer 5, ADR 0004): 202 with a status resource, background execution with the caller's
+  identity, cooperative cancellation, and sagas with compensations that resume after a restart.
+- Builder: `with_expressions`, `with_oidc`, `with_oauth`; the operations API is mounted on every app.
+- Review fixes before release: `$eval` refused (it bypassed the regex switch); dynamic access refused on closed
+  schemas; string, array and `$pad` sizes bounded during evaluation. Tokens without a tenant claim refused unless
+  they carry a platform role. JWKS outages keep the last good keys and back off. `service_client(acting="caller")`
+  fails closed. Operations: row locks, leases against double runs, a `stalled` status for failed compensations,
+  deadline failures recorded, the creator's roles kept on resume, generic internal error details, visibility limited
+  to the creator and `operations.read`. Token cache has a hard size bound.
+
+### platform-testing
+- Added `ExpressionEngineContract`.
+
+### platform-tools
+- Added `pk scaffold service` and `pk scaffold plugin`. Generated code passes `pk check`, ruff and its own tests on
+  the first run, proven by a golden test (F14). Names that are keywords, standard library modules or installed
+  packages are refused, `--dir` must stay inside the repository, `pyproject.toml` is edited as TOML (comments kept),
+  and generation is atomic: a failure leaves the repository unchanged.
+
+
 ## 0.1.0 (unreleased): walking skeleton
 
 All packages at 0.1.0. Pre-1.0: the API may change between minor versions (F1).
