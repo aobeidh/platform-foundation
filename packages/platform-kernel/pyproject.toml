@@ -1,0 +1,28 @@
+[project]
+name = "platform-kernel"
+version = "0.1.0"
+description = "Platform kernel: layered modules with ports, providers and contract suites."
+requires-python = ">=3.12"
+dependencies = [
+  "platform-plugin-sdk",
+  "pydantic>=2.7",
+  "fastapi>=0.115",
+  "httpx>=0.27",
+  "sqlalchemy>=2.0",
+  "structlog>=24.1",
+  "opentelemetry-api>=1.27",
+  "jsonschema>=4.23",
+  "packaging>=24.0",
+  "pyjwt>=2.9",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.2"]
+
+[tool.uv.sources]
+platform-plugin-sdk = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

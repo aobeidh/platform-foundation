@@ -1,0 +1,1 @@
+CONNECTION_NOT_ACTIVE: {status: 409, retryable: false, title: Connection not active, remedy: Approve the connection or resume it before sending.}

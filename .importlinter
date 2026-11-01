@@ -1,0 +1,61 @@
+[importlinter]
+root_packages =
+    platform_kernel
+    platform_plugin_sdk
+    exemplar_connections
+include_external_packages = True
+
+[importlinter:contract:kernel-layers]
+name = Kernel layers (F3, ADR 0002)
+type = layers
+containers = platform_kernel
+layers =
+    platform
+    governance
+    messaging | http | plugins
+    persistence
+    identity | policy | tenancy | audit | observability | errors
+    contracts | config | context
+    core
+
+[importlinter:contract:sdk-is-lowest]
+name = The plugin SDK never imports the kernel or a product (ADR 0002)
+type = forbidden
+source_modules = platform_plugin_sdk
+forbidden_modules =
+    platform_kernel
+    exemplar_connections
+
+[importlinter:contract:kernel-core-pure]
+name = Kernel core imports no frameworks (P3)
+type = forbidden
+source_modules = platform_kernel.core
+forbidden_modules =
+    fastapi
+    sqlalchemy
+    psycopg
+    httpx
+
+[importlinter:contract:exemplar-layers]
+name = Exemplar dependencies point inward (P3)
+type = layers
+containers = exemplar_connections
+layers =
+    main
+    wiring
+    adapters
+    application
+    domain
+
+[importlinter:contract:exemplar-domain-pure]
+name = Exemplar domain and application import no web or database frameworks (P3)
+type = forbidden
+source_modules =
+    exemplar_connections.domain
+    exemplar_connections.application
+forbidden_modules =
+    fastapi
+    sqlalchemy
+    psycopg
+    httpx
+allow_indirect_imports = True

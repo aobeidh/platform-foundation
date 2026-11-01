@@ -1,0 +1,203 @@
+{
+  "$defs": {
+    "HistoryEntry": {
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "flow": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow"
+        },
+        "step": {
+          "title": "Step",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        }
+      },
+      "required": [
+        "step",
+        "at"
+      ],
+      "title": "HistoryEntry",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "causationid": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Causationid"
+    },
+    "correlationid": {
+      "title": "Correlationid",
+      "type": "string"
+    },
+    "data": {
+      "additionalProperties": true,
+      "title": "Data",
+      "type": "object"
+    },
+    "datacontenttype": {
+      "default": "application/json",
+      "title": "Datacontenttype",
+      "type": "string"
+    },
+    "dataschema": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Dataschema"
+    },
+    "expiresat": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expiresat"
+    },
+    "history": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/HistoryEntry"
+      },
+      "title": "History",
+      "type": "array"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "default": "event",
+      "enum": [
+        "event",
+        "command",
+        "document"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "replyto": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Replyto"
+    },
+    "source": {
+      "title": "Source",
+      "type": "string"
+    },
+    "specversion": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Specversion",
+      "type": "string"
+    },
+    "subject": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Subject"
+    },
+    "tenantid": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tenantid"
+    },
+    "test": {
+      "default": false,
+      "title": "Test",
+      "type": "boolean"
+    },
+    "time": {
+      "format": "date-time",
+      "title": "Time",
+      "type": "string"
+    },
+    "traceparent": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Traceparent"
+    },
+    "type": {
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "source",
+    "type",
+    "time",
+    "correlationid"
+  ],
+  "title": "Envelope",
+  "type": "object"
+}

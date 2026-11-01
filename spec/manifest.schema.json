@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://platform-foundation/spec/manifest.schema.json",
+  "title": "Service manifest",
+  "type": "object",
+  "required": ["name", "tier", "owner", "package", "schema", "contracts", "calls", "publishes", "consumes", "residency"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$"},
+    "tier": {"enum": ["E", "S", "P"]},
+    "owner": {"type": "string", "minLength": 1},
+    "package": {"type": "string", "pattern": "^[a-z_][a-z0-9_]*$"},
+    "schema": {"type": "string", "pattern": "^[a-z_][a-z0-9_]{0,62}$"},
+    "app": {"type": "string", "pattern": "^[a-z_][a-z0-9_.]*:[a-z_][a-z0-9_]*$"},
+    "contracts": {
+      "type": "object", "required": ["http"], "additionalProperties": false,
+      "properties": {"http": {"type": "string"}, "events": {"type": "string"}}
+    },
+    "errors": {"type": "string"},
+    "migrations": {"type": "string"},
+    "calls": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "publishes": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9_-]+(\\.[a-z0-9_-]+)+\\.v[0-9]+$"}, "uniqueItems": true},
+    "consumes": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9_-]+(\\.[a-z0-9_-]+)+\\.v[0-9]+$"}, "uniqueItems": true},
+    "interfaces": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object", "required": ["providers", "default"],
+        "properties": {"providers": {"type": "array", "items": {"type": "string"}, "minItems": 2}, "default": {"type": "string"}}
+      }
+    },
+    "plugins_hosted": {"type": "array", "items": {"type": "string"}},
+    "residency": {
+      "type": "object", "required": ["runs_in", "data"],
+      "properties": {"runs_in": {"type": "array", "items": {"type": "string"}, "minItems": 1}, "data": {"type": "array", "items": {"type": "string"}}}
+    }
+  }
+}

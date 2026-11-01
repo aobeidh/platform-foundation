@@ -1,0 +1,14 @@
+[project]
+name = "exemplar-connections"
+version = "0.1.0"
+description = "Exemplar service that uses every kernel module (F15)."
+requires-python = ">=3.12"
+dependencies = ["platform-kernel", "platform-plugin-sdk"]
+
+[tool.uv.sources]
+platform-kernel = { workspace = true }
+platform-plugin-sdk = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

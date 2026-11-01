@@ -1,0 +1,21 @@
+# Error codes owned by the kernel. Products add their own catalogs (P51).
+INTERNAL_ERROR:        {status: 500, retryable: true,  title: Internal error, remedy: Retry later. If it persists, contact support with the correlation ID.}
+VALIDATION_FAILED:     {status: 422, retryable: false, title: Validation failed, remedy: Correct the fields listed in errors and send the request again.}
+UNAUTHENTICATED:       {status: 401, retryable: false, title: Authentication required, remedy: Send a valid bearer token.}
+TOKEN_INVALID:         {status: 401, retryable: false, title: Token not valid, remedy: Obtain a new token from the identity provider.}
+TOKEN_EXPIRED:         {status: 401, retryable: false, title: Token expired, remedy: Obtain a new token from the identity provider.}
+FORBIDDEN:             {status: 403, retryable: false, title: Not allowed, remedy: Ask an administrator for a role that grants this capability.}
+NOT_FOUND:             {status: 404, retryable: false, title: Not found, remedy: Check the identifier.}
+CONFLICT:              {status: 409, retryable: false, title: Conflict, remedy: Reload the resource and apply your change again.}
+REVISION_CONFLICT:     {status: 409, retryable: false, title: Revision conflict, remedy: Someone changed this record. Reload it and apply your change again.}
+IDEMPOTENCY_KEY_REUSED: {status: 409, retryable: false, title: Idempotency key reused, remedy: Use a new Idempotency-Key for a different request.}
+IDEMPOTENCY_IN_PROGRESS: {status: 409, retryable: true, title: Request in progress, remedy: Wait and retry with the same Idempotency-Key.}
+PAYLOAD_TOO_LARGE:     {status: 413, retryable: false, title: Payload too large, remedy: Send a smaller body or use a claim check.}
+DEADLINE_EXCEEDED:     {status: 504, retryable: true,  title: Deadline exceeded, remedy: Retry with a longer deadline or try later.}
+DEPENDENCY_UNAVAILABLE: {status: 503, retryable: true, title: Dependency unavailable, remedy: Retry later.}
+EGRESS_BLOCKED:        {status: 403, retryable: false, title: Outbound call blocked, remedy: Ask an administrator to approve the host in the egress policy.}
+INVALID_TRANSITION:    {status: 409, retryable: false, title: Transition not allowed, remedy: Check the record's current state.}
+MAKER_CHECKER:         {status: 403, retryable: false, title: Second person required, remedy: Ask a different person to approve.}
+NOT_TESTED:            {status: 409, retryable: false, title: Test required, remedy: Run the test and fix any failed checks before submitting.}
+PLUGIN_NOT_FOUND:      {status: 404, retryable: false, title: Plugin not found, remedy: Check the plugin id and version, or install the plugin.}
+PLUGIN_FAILED:         {status: 502, retryable: true,  title: Plugin failed, remedy: Check the plugin's configuration and logs.}

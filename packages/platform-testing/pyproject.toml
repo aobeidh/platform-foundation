@@ -1,0 +1,13 @@
+[project]
+name = "platform-testing"
+version = "0.1.0"
+description = "Contract suites and test helpers for products on the platform foundation."
+requires-python = ">=3.12"
+dependencies = ["platform-kernel", "pytest>=8.3", "jsonschema>=4.23"]
+
+[tool.uv.sources]
+platform-kernel = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
