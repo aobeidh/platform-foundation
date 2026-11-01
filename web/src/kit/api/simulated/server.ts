@@ -178,17 +178,26 @@ export class SimulatedTransport implements Transport {
           onBehalfOf: null, capabilities: this.seed.capabilities.filter((x) => caps.has(x.name)).sort((a, b) => a.name.localeCompare(b.name)),
           service: this.seed.service, simulated: this.seed.simulated });
       }
-      if (seg[1] === 'kinds') return ok(this.seed.kinds);
+      const caps = this.effective(c);
+      if (seg[1] === 'kinds') return ok({ ...this.seed.kinds, items: this.seed.kinds.items.filter((k) => caps.has(k.capabilities.read)) });
       if (seg[1] === 'plugins') {
-        const items = this.seed.plugins.map(({ test: _t, send: _s, validate: _v, ...info }) => info);
-        return ok({ items, total: items.length });
+        if (!this.seed.kinds.items.some((k) => caps.has(k.capabilities.read))) throw new Fail('FORBIDDEN', 'None of your roles can read what plugins configure.');
+        const detail = this.seed.kinds.items.some((k) => caps.has(k.capabilities.write));
+        const items = this.seed.plugins.map(({ test: _t, send: _s, validate: _v, ...info }) =>
+          (detail ? info : { ...info, configSchema: { type: 'object' }, secrets: [] }));
+        return ok({ items, total: items.length, detail });
       }
     }
 
     if (seg[0] === 'operations') {
       if (seg.length === 1 && method === 'GET') {
+        const raw = new URLSearchParams(req.path.split('?')[1] ?? '').get('limit');
+        const limit = raw === null ? 50 : Number(raw);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+          throw new Fail('VALIDATION_FAILED', 'The request is not valid.', [{ pointer: '/limit', code: 'range', message: 'Input should be between 1 and 200' }]);
+        }
         const items = this.state.operations.filter((o) => this.opVisible(c, o)).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-          .slice(0, 50).map((o) => this.opJson(o));
+          .slice(0, limit).map((o) => this.opJson(o));
         return ok({ items, total: items.length });
       }
       const op = this.state.operations.find((o) => o.id === seg[1]);
@@ -271,6 +280,8 @@ export class SimulatedTransport implements Transport {
     }
     const stored = this.state.records.find((r) => r.record.kind === kind.kind && r.record.id === seg[0]);
     const product = kind.kind === 'connection' && (seg[1] === 'send' || seg[1] === 'send-batch');
+    if (product) this.require(c, 'connections:use');
+    if (product && seg[1] === 'send-batch') this.validBatch(body);
     if (!product) this.require(c, method === 'GET' ? caps.read : seg[1] === 'approve' || seg[1] === 'reject' ? caps.approve : caps.write);
     if (!stored || !this.visible(c, stored.record.tenant)) throw new Fail('NOT_FOUND', `${kind.kind} ${seg[0]} was not found.`);
     if (method === 'GET' && seg.length === 1) return this.respond(stored);
@@ -326,7 +337,7 @@ export class SimulatedTransport implements Transport {
         break;
       }
       case 'reject':
-        if (typeof body.reason !== 'string' || !body.reason) throw new Fail('VALIDATION_FAILED', 'The request is not valid.', [{ pointer: '/reason', code: 'missing', message: 'Field required' }]);
+        if (typeof body.reason !== 'string' || !body.reason || body.reason.length > 500) throw new Fail('VALIDATION_FAILED', 'The request is not valid.', [{ pointer: '/reason', code: 'missing', message: 'Field required' }]);
         if (cur.status !== 'submitted') throw new Fail('INVALID_TRANSITION', 'Only a submitted version can be rejected.');
         Object.assign(cur, { status: 'draft', submittedBy: null, testResult: null });
         break;
@@ -381,22 +392,32 @@ export class SimulatedTransport implements Transport {
     return stored.versions.find((v) => v.version === r.activeVersion)?.spec ?? null;
   }
 
-  private sendOne(stored: SimStoredRecord, payload: Record<string, unknown>) {
+  private sendOne(stored: SimStoredRecord, payload: Record<string, unknown>, version?: number) {
     const spec = this.activeSpec(stored);
-    if (!spec) throw new Fail('CONNECTION_NOT_ACTIVE', `Connection ${stored.record.id} is not active.`);
+    if (!spec) throw new Fail('CONNECTION_NOT_ACTIVE', version ? `Connection ${stored.record.id} is no longer running version ${version}.` : `Connection ${stored.record.id} is not active.`);
+    if (version && stored.record.activeVersion !== version) throw new Fail('CONNECTION_NOT_ACTIVE', `Connection ${stored.record.id} is no longer running version ${version}.`);
     const plugin = this.plugin(spec);
     if (!plugin) throw new Fail('PLUGIN_NOT_FOUND', `No connector plugin ${String(spec.connector)} is installed.`);
     return plugin.send?.((spec.config ?? {}) as Record<string, unknown>, payload, this.now()) ?? { accepted: true, at: this.now().toISOString() };
   }
 
+  private validBatch(body: Record<string, unknown>) {
+    const p = body.payloads;
+    if (!Array.isArray(p) || p.length < 1 || p.length > 1000) {
+      throw new Fail('VALIDATION_FAILED', 'The request is not valid.', [{ pointer: '/payloads', code: 'length', message: 'Send between 1 and 1000 payloads' }]);
+    }
+  }
+
   private exemplar(stored: SimStoredRecord, action: string, body: Record<string, unknown>, c: Caller): ApiResponse {
-    this.require(c, 'connections:use');
     if (action === 'send') return { status: 200, headers: {}, body: { result: this.sendOne(stored, (body.payload ?? {}) as Record<string, unknown>) } };
-    const payloads = Array.isArray(body.payloads) ? (body.payloads as Record<string, unknown>[]) : [];
+    // Answer now if the connection cannot run, and pin the version that runs the whole batch.
+    if (stored.record.status !== 'active' || !stored.record.activeVersion) throw new Fail('CONNECTION_NOT_ACTIVE', `Connection ${stored.record.id} is not active.`);
+    const version = stored.record.activeVersion;
+    const payloads = body.payloads as Record<string, unknown>[];
     const now = this.now().toISOString();
     const op = { id: simId(), kind: 'connections.send-batch', status: 'pending' as const, progress: 0, result: null, error: null,
       cancelRequested: false, createdBy: c.subject, createdAt: now, updatedAt: now, tenant: c.tenant,
-      input: { id: stored.record.id, payloads }, done: 0 };
+      input: { id: stored.record.id, version, payloads }, done: 0 };
     this.state.operations.push(op);
     this.schedule(op.id);
     return { status: 202, headers: { location: `/api/v1/operations/${op.id}` }, body: this.opJson(op) };
@@ -431,13 +452,13 @@ export class SimulatedTransport implements Transport {
         const stored = this.state.records.find((r) => r.record.id === op.input.id);
         try {
           if (!stored) throw new Fail('NOT_FOUND', 'Connection not found.');
-          if (op.done < payloads.length) { this.sendOne(stored, payloads[op.done]); op.done += 1; }
+          if (op.done < payloads.length) { this.sendOne(stored, payloads[op.done], op.input.version as number | undefined); op.done += 1; }
           op.progress = payloads.length ? Math.round((100 * op.done) / payloads.length) : 100;
           op.updatedAt = at;
           if (op.done >= payloads.length) finish('succeeded', { progress: 100, result: { sent: payloads.length } });
         } catch (e) {
           const f = e instanceof Fail ? e : new Fail('INTERNAL_ERROR', 'The operation failed unexpectedly.');
-          finish('failed', { error: { code: f.code, detail: f.detail } });
+          finish('failed', { error: { code: f.code, detail: `${f.detail} ${op.done} of ${payloads.length} payloads were sent.` } });
         }
       }
       this.save();

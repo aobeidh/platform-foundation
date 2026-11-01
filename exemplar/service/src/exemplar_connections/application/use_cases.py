@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 from platform_kernel.contracts import Envelope
-from platform_kernel.core import DomainError, Err, Result
+from platform_kernel.core import DomainError, Err, Ok, Result
 from platform_kernel.governance import GovernanceEngine, GovernedKind
 from platform_kernel.plugins import PluginHost
 from platform_plugin_sdk import Check
@@ -42,16 +42,35 @@ class ConnectionChecks:
         return list(result.value)
 
 
+class ActiveVersion:
+    """Which version of a connection runs now, or an error a caller can show at once (NOT_FOUND, NOT_ACTIVE)."""
+
+    def __init__(self, governance: GovernanceEngine) -> None:
+        self._gov = governance
+
+    def __call__(self, connection_id: str) -> Result[int, DomainError]:
+        found = self._gov.get(CONNECTION, connection_id)
+        if not found.ok:
+            return found
+        record = found.value.record
+        if record.status != "active" or record.active_version is None:
+            return Err(DomainError("CONNECTION_NOT_ACTIVE", f"Connection {connection_id} is not active."))
+        return Ok(record.active_version)
+
+
 class SendThroughConnection:
     """Send a payload through the active version of a connection. Drafts never run (P13)."""
 
     def __init__(self, governance: GovernanceEngine, host: PluginHost, plugin_context: Callable[[], Any]) -> None:
         self._gov, self._host, self._ctx = governance, host, plugin_context
 
-    def __call__(self, connection_id: str, payload: dict[str, Any]) -> Result[dict[str, Any], DomainError]:
-        spec = self._gov.active_spec(CONNECTION, connection_id)
+    def __call__(self, connection_id: str, payload: dict[str, Any],
+                 version: int | None = None) -> Result[dict[str, Any], DomainError]:
+        spec = self._gov.active_spec(CONNECTION, connection_id, version)
         if spec is None:
-            return Err(DomainError("CONNECTION_NOT_ACTIVE", f"Connection {connection_id} is not active."))
+            detail = (f"Connection {connection_id} is no longer running version {version}." if version is not None
+                      else f"Connection {connection_id} is not active.")
+            return Err(DomainError("CONNECTION_NOT_ACTIVE", detail))
         assert isinstance(spec, ConnectionSpec)
         return self._host.call(spec.connector, spec.connector_version, "send", spec.config, payload, self._ctx())
 

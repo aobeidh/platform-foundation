@@ -36,7 +36,7 @@ export function PluginsPage() {
                     <Badge tone="selected">{p.kind}</Badge><StyleChip style={styleOf(p)} />
                     {p.capabilities.map((c) => <Badge key={c}>{c}</Badge>)}
                   </div>
-                  <div>
+                  {!plugins.data?.detail ? <p className="text-12 text-dim">{t('plug.withheld')}</p> : <div>
                     <div className="eyebrow mb-1.5">{t('plug.settings')}</div>
                     <ul className="divide-y divide-line rounded-[10px] border border-line">
                       {Object.entries(p.configSchema.properties ?? {}).map(([k, s]) => (
@@ -46,7 +46,7 @@ export function PluginsPage() {
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </div>}
                   {!!p.secrets.length && <div className="flex flex-wrap items-center gap-1.5 text-12 text-muted"><KeyRound className="size-3.5" aria-hidden />{t('plug.secrets')}: {p.secrets.map((s) => <Mono key={s}>{s}</Mono>)}</div>}
                   {records.data && <p className="text-12 text-dim">{t('plug.used', { n: used(p.id, p.version) })}</p>}
                 </CardContent>

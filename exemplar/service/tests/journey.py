@@ -57,6 +57,12 @@ def run(platform: Any, client: Any) -> dict[str, Any]:
     keep("failedTest", client.post(f"{base}/{bad['id']}/test", headers=at(ADA, bad)))
     keep("stale", client.post(f"/api/v1/connections/{cid}/pause", headers={**ADA, "If-Match": '"1"'}))
     keep("invalid", client.post("/api/v1/connections", headers=ADA, json={"spec": {"name": "x"}}))
+    keep("batchNotActive", client.post(f"{base}/{bad['id']}/send-batch", headers=ADA, json={"payloads": [{}]}))
+    keep("batchMissing", client.post(f"{base}/nope/send-batch", headers=ADA, json={"payloads": [{}]}))
+    keep("batchEmpty", client.post(f"{base}/{cid}/send-batch", headers=ADA, json={"payloads": []}))
+    keep("batchNoUse", client.post(f"{base}/nope/send-batch", headers=OMAR, json={"payloads": [{}]}))
+    keep("pluginsApprover", client.get("/api/v1/portal/plugins", headers=OMAR))
+    keep("operationsBadLimit", client.get("/api/v1/operations?limit=0", headers=ADA))
     keep("anon", client.get("/api/v1/portal/me"))
     return out
 

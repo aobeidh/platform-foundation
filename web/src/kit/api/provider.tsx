@@ -19,7 +19,7 @@ const Ctx = createContext<ApiContextValue | null>(null);
 function Bridge({ value, children }: { value: ApiContextValue; children: React.ReactNode }) {
   const qc = useQueryClient();
   // Background work in the simulated provider (operations advancing) refreshes what is on screen.
-  useEffect(() => value.simulated?.subscribe(() => { void qc.invalidateQueries(); }), [value.simulated, qc]);
+  useEffect(() => value.simulated?.subscribe(() => { void qc.invalidateQueries({ queryKey: ['operations'] }); }), [value.simulated, qc]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

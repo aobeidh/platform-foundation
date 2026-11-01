@@ -21,6 +21,7 @@
               "type": "object"
             },
             "maxItems": 1000,
+            "minItems": 1,
             "title": "Payloads",
             "type": "array"
           }
@@ -60,6 +61,8 @@
       "Body_with_reason_api_v1_connections__id__reject_post": {
         "properties": {
           "reason": {
+            "maxLength": 500,
+            "minLength": 1,
             "title": "Reason",
             "type": "string"
           }
@@ -913,6 +916,8 @@
             "required": false,
             "schema": {
               "default": 50,
+              "maximum": 200,
+              "minimum": 1,
               "title": "Limit",
               "type": "integer"
             }
@@ -1053,7 +1058,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Governed kinds with their schema, lifecycle and capabilities",
+        "summary": "Governed kinds the caller may read, with their schema, lifecycle and capabilities",
         "tags": [
           "portal"
         ]
@@ -1099,7 +1104,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Installed plugins by kind, with their configuration schemas",
+        "summary": "Installed plugins by kind; configuration schemas only for people who configure",
         "tags": [
           "portal"
         ]

@@ -203,3 +203,42 @@ def test_api_shapes_match_the_web_kit_conformance_fixture():
     assert {k: v["status"] for k, v in live.items()} == {k: v["status"] for k, v in recorded.items()}
     for key in recorded:
         assert shape(live[key]["body"]) == shape(recorded[key]["body"]), key
+
+
+def test_r3_r4_batch_checks_the_connection_up_front_and_stops_when_it_is_paused(system):
+    platform, client = system
+    gone = client.post("/api/v1/connections/missing/send-batch", headers=ADMIN, json={"payloads": [{}]})
+    assert gone.status_code == 404
+    draft = client.post("/api/v1/connections", headers=ADMIN, json={"spec": {
+        "name": "D", "connector": "echo", "connector_version": "1.0.0", "config": {"prefix": "d"}}}).json()
+    assert client.post(f"/api/v1/connections/{draft['id']}/send-batch", headers=ADMIN,
+                       json={"payloads": [{}]}).json()["code"] == "CONNECTION_NOT_ACTIVE"
+    cid = make_active(client, prefix="p:")
+    rec = client.get(f"/api/v1/connections/{cid}", headers=ADMIN)
+    client.post(f"/api/v1/connections/{cid}/pause", headers=ADMIN | etag(rec))
+    # The batch was accepted before the pause in real life; here start it through the runner with the pinned version.
+    from datetime import timedelta
+
+    from platform_kernel import context as ctxmod
+    from platform_kernel.context import Principal, RequestContext, TenantScope
+
+    pr = Principal("ada", roles=frozenset({"integration-admin"}), tenant="t1")
+    with ctxmod.use(RequestContext(principal=pr, tenant=TenantScope.resolve(pr), correlation_id="c",
+                                   deadline=datetime.now(UTC) + timedelta(seconds=30))):
+        op = platform.operations.start("connections.send-batch",
+                                       {"id": cid, "version": 1, "payloads": [{}, {}]}).value
+    platform.operations.wait(op.id)
+    failed = client.get(f"/api/v1/operations/{op.id}", headers=ADMIN).json()
+    assert failed["status"] == "failed" and failed["error"]["code"] == "CONNECTION_NOT_ACTIVE"
+    assert "0 of 2 payloads were sent" in failed["error"]["detail"]
+
+
+def test_r7_reject_needs_a_reason(system):
+    _, client = system
+    r = client.post("/api/v1/connections", headers=ADMIN, json={"spec": {
+        "name": "R", "connector": "echo", "connector_version": "1.0.0", "config": {"prefix": "r"}}})
+    cid = r.json()["id"]
+    r = client.post(f"/api/v1/connections/{cid}/test", headers=ADMIN | etag(r))
+    r = client.post(f"/api/v1/connections/{cid}/submit", headers=ADMIN | etag(r))
+    empty = client.post(f"/api/v1/connections/{cid}/reject", headers=APPROVER | etag(r), json={"reason": ""})
+    assert empty.status_code == 422

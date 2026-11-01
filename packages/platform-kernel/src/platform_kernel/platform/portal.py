@@ -51,27 +51,37 @@ def portal_router(platform: Platform, prefix: str = "/api/v1") -> APIRouter:
                 "roles": sorted(p.roles), "onBehalfOf": p.on_behalf_of, "capabilities": caps,
                 "service": platform.settings.service, "simulated": platform.simulated}
 
-    @r.get("/kinds", summary="Governed kinds with their schema, lifecycle and capabilities")
+    @r.get("/kinds", summary="Governed kinds the caller may read, with their schema, lifecycle and capabilities")
     def kinds() -> dict[str, Any]:
         _signed_in()
+        allowed = platform.policy.capabilities(ctxmod.current().principal)
         items = []
         for k in platform.governance.kinds():
+            if k.read not in allowed:
+                continue
             items.append({"kind": k.kind, "plural": k.plural, "display": k.display,
                           "makerChecker": k.maker_checker, "schema": k.spec.model_json_schema(),
                           "capabilities": {"read": k.read, "write": k.write, "approve": k.approve},
                           "tests": [getattr(t, "__name__", "check") for t in k.tests]})
         return {"items": items, "lifecycle": LIFECYCLE}
 
-    @r.get("/plugins", summary="Installed plugins by kind, with their configuration schemas")
+    @r.get("/plugins", summary="Installed plugins by kind; configuration schemas only for people who configure")
     def plugins() -> dict[str, Any]:
         _signed_in()
+        allowed = platform.policy.capabilities(ctxmod.current().principal)
+        if not any(k.read in allowed for k in platform.governance.kinds()):
+            raise DomainException(DomainError("FORBIDDEN", "None of your roles can read what plugins configure."))
+        # Configuration schemas and secret names describe how to reach other systems: writers see them.
+        detail = any(k.write in allowed for k in platform.governance.kinds())
         items = []
         for kind, host in sorted(platform._plugin_hosts.items()):
             for d in host.descriptors():
-                items.append({"kind": kind, "id": d.id, "version": d.version, "spi": d.spi,
-                              "capabilities": sorted(d.capabilities), "display": d.display,
-                              "publisher": d.publisher, "configSchema": d.config_schema,
-                              "secrets": list(d.secrets)})
-        return {"items": items, "total": len(items)}
+                item: dict[str, Any] = {"kind": kind, "id": d.id, "version": d.version, "spi": d.spi,
+                                        "capabilities": sorted(d.capabilities), "display": d.display,
+                                        "publisher": d.publisher, "configSchema": {"type": "object"}, "secrets": []}
+                if detail:
+                    item.update(configSchema=d.config_schema, secrets=list(d.secrets))
+                items.append(item)
+        return {"items": items, "total": len(items), "detail": detail}
 
     return r

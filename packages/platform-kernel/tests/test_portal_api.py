@@ -77,3 +77,41 @@ def test_operations_list_shows_only_what_the_caller_may_see():
     assert [i["id"] for i in items] == [mine]
     assert other and elsewhere
     p.close()
+
+
+# Review findings (0.3) ---------------------------------------------------------------------------------------------
+
+def test_r1_others_operations_never_crowd_out_the_callers_own():
+    from datetime import UTC, datetime, timedelta
+
+    from platform_kernel import context as ctxmod
+    from platform_kernel.context import Principal, RequestContext, TenantScope
+
+    p, c = _app()
+    p.operations.register("noop", lambda i, h: {})
+
+    def start(subject):
+        pr = Principal(subject, tenant="t1")
+        with ctxmod.use(RequestContext(principal=pr, tenant=TenantScope.resolve(pr), correlation_id="c",
+                                       deadline=datetime.now(UTC) + timedelta(seconds=30))):
+            op = p.operations.start("noop", {}).value
+        p.operations.wait(op.id)
+        return op.id
+
+    mine = start("ada")
+    for _ in range(30):
+        start("bob")
+    items = c.get("/api/v1/operations?limit=5", headers={"Authorization": "Bearer demo:ada:writer:t1"}).json()["items"]
+    assert [i["id"] for i in items] == [mine]
+    ada = {"Authorization": "Bearer demo:ada:writer:t1"}
+    for bad in ("0", "-1", "201"):
+        assert c.get(f"/api/v1/operations?limit={bad}", headers=ada).status_code == 422
+    p.close()
+
+
+def test_r6_kinds_and_plugin_schemas_follow_capabilities():
+    p, c = _app()
+    stranger = {"Authorization": "Bearer demo:eve:nobody:t9"}
+    assert c.get("/api/v1/portal/kinds", headers=stranger).json()["items"] == []
+    assert c.get("/api/v1/portal/plugins", headers=stranger).status_code == 403
+    p.close()

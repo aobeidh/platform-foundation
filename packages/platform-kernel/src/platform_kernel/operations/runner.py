@@ -65,6 +65,10 @@ class Handle:
     def progress(self, percent: int) -> None:
         self._runner._update(self.id, lambda op: op.with_(progress=max(0, min(100, int(percent)))))
 
+    def step(self, state: dict[str, Any], percent: int) -> None:
+        """Save state and progress together, in one write: the cheap way to record each step of a long loop."""
+        self._runner._update(self.id, lambda op: op.with_(state=dict(state), progress=max(0, min(100, int(percent)))))
+
     def check_cancelled(self) -> None:
         """Call between units of work: stops on a cancel request or once the operation's deadline has passed."""
         ctxmod.check_deadline("the next step of the operation")
@@ -147,9 +151,13 @@ class OperationRunner:
         return Ok(op)
 
     def recent(self, limit: int = 50) -> list[Operation]:
-        """Operations the caller may see, newest first."""
+        """Operations the caller may see, newest first. Without a reader role the store filters by creator, so
+        other people's work can never crowd out the caller's own."""
+        ctx = ctxmod.current()
+        limit = max(1, min(int(limit), 200))
+        reader = ctx.tenant.platform or bool(ctx.principal.roles & self._readers)
         with self._uow() as uow:
-            ops = self._store.recent(uow, max(1, min(limit, 200)) * 4)
+            ops = self._store.recent(uow, limit, None if reader else ctx.principal.subject)
         return [o for o in ops if self._visible(o)][:limit]
 
     def cancel(self, id: str) -> Result[Operation, DomainError]:
@@ -164,7 +172,7 @@ class OperationRunner:
             if op.status in FINISHED:
                 return Err(DomainError("INVALID_TRANSITION", f"Operation {id} has already {op.status}."))
             op = op.with_(cancel_requested=True, updated_at=self._clock.now())
-            self._store.save(uow, op)
+            self._store.update(uow, op)
             self._event(uow, op, "cancel_requested")
         return Ok(op)
 
@@ -232,7 +240,7 @@ class OperationRunner:
                 return None
             op = op.with_(status="running", lease_owner=self._instance, lease_until=now + self._timeout,
                           updated_at=now)
-            self._store.save(uow, op)
+            self._store.update(uow, op)
             return op
 
     def _run(self, op_id: str, ctx: RequestContext) -> None:
@@ -270,7 +278,7 @@ class OperationRunner:
             op = op.with_(status=status, result=result, error=error,
                           progress=100 if status == "succeeded" else op.progress,
                           lease_owner=None, lease_until=None, updated_at=self._clock.now())
-            self._store.save(uow, op)
+            self._store.update(uow, op)
             self._event(uow, op, status)
 
     def _load(self, op_id: str) -> Operation:
@@ -285,7 +293,7 @@ class OperationRunner:
             if op is None:
                 raise LookupError(op_id)
             op = change(op).with_(updated_at=self._clock.now())
-            self._store.save(uow, op)
+            self._store.update(uow, op)
             return op
 
     def _event(self, uow: Any, op: Operation, what: str) -> None:

@@ -40,7 +40,7 @@ export function ApprovalsPage() {
   const records = useRecords<ConnectionSpec>('connections', can('connections:read'));
   useSetStage('approve');
   const waiting = (records.data?.items ?? []).filter((r) => r.current.status === 'submitted');
-  const authored = (r: Connection) => [r.current.createdBy, ...r.current.editedBy, r.current.submittedBy].includes(me.data?.subject ?? '');
+  const authored = (r: Connection) => r.current.makerChecker && [r.current.createdBy, ...r.current.editedBy, r.current.submittedBy].includes(me.data?.subject ?? '');
   const mine = can('connections:approve') ? waiting.filter((r) => !authored(r)) : [];
   const others = waiting.filter((r) => !mine.includes(r));
   return (

@@ -13,6 +13,7 @@ from .adapters.outbound.memory_repo import MemoryActivationRepository
 from .adapters.outbound.postgres_repo import PostgresActivationRepository
 from .application.spi import SPI_VERSION, ConnectorSpi
 from .application.use_cases import (
+    ActiveVersion,
     ConnectionChecks,
     ListActivations,
     RecordActivation,
@@ -62,5 +63,5 @@ def build(settings: PlatformSettings | None = None, *, discover_plugins: bool = 
     platform.consumers.subscribe(f"{SERVICE}.connection.approved.v1", "record-activation", RecordActivation(repo))
     app = platform.create_app([router(SendThroughConnection(platform.governance, host, platform.plugin_context),
                                       ListActivations(repo, platform.uow), platform.authz,
-                                      platform.operations)])
+                                      platform.operations, ActiveVersion(platform.governance))])
     return platform, app

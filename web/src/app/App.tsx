@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { HashRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { HashRouter, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { Activity, Boxes, CheckCheck, Gauge, Languages, Moon, Palette, Plug, RotateCcw, ShieldCheck, Sun, Workflow, Zap } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApi, useCan, useMe, useOperations, useRecords, type Connection } from '@/kit/api';
@@ -42,7 +42,7 @@ function useApprovalCount() {
   const records = useRecords<Connection['current']['spec']>('connections', can('connections:read'));
   if (!me.data || !can('connections:approve')) return 0;
   return (records.data?.items ?? []).filter((r) => r.current.status === 'submitted'
-    && ![r.current.createdBy, ...r.current.editedBy, r.current.submittedBy].includes(me.data!.subject)).length;
+    && !(r.current.makerChecker && [r.current.createdBy, ...r.current.editedBy, r.current.submittedBy].includes(me.data!.subject))).length;
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -124,6 +124,12 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** A fresh page per connection, so state from one (a running batch, a notice) never shows on another. */
+function KeyedDetail() {
+  const { id } = useParams();
+  return <ConnectionDetailPage key={id} />;
+}
+
 export function App() {
   return (
     <HashRouter>
@@ -132,7 +138,7 @@ export function App() {
           <Routes>
             <Route path="/" element={<OverviewPage />} />
             <Route path="/connections" element={<ConnectionsPage />} />
-            <Route path="/connections/:id" element={<ConnectionDetailPage />} />
+            <Route path="/connections/:id" element={<KeyedDetail />} />
             <Route path="/approvals" element={<ApprovalsPage />} />
             <Route path="/operations" element={<OperationsPage />} />
             <Route path="/activations" element={<ActivationsPage />} />

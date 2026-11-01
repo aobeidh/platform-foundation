@@ -64,6 +64,11 @@ export interface PluginInfo {
   display: Record<string, string>; publisher: string; configSchema: JsonSchema; secrets: string[];
 }
 
+export interface Plugins extends Page<PluginInfo> {
+  /** False when the caller may not configure: schemas and secret names are then withheld. */
+  detail: boolean;
+}
+
 export type OperationStatus = 'pending' | 'running' | 'stalled' | 'succeeded' | 'failed' | 'cancelled';
 
 export interface Operation {

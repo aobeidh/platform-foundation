@@ -51,6 +51,12 @@ async function journey() {
   await call('failedTest', 'POST', `${base}/${String(bad.id)}/test`, at(ADA, bad));
   await call('stale', 'POST', `${base}/${id}/pause`, { ...ADA, 'If-Match': '"1"' });
   await call('invalid', 'POST', base, ADA, { spec: { name: 'x' } });
+  await call('batchNotActive', 'POST', `${base}/${String(bad.id)}/send-batch`, ADA, { payloads: [{}] });
+  await call('batchMissing', 'POST', `${base}/nope/send-batch`, ADA, { payloads: [{}] });
+  await call('batchEmpty', 'POST', `${base}/${id}/send-batch`, ADA, { payloads: [] });
+  await call('batchNoUse', 'POST', `${base}/nope/send-batch`, OMAR, { payloads: [{}] });
+  await call('pluginsApprover', 'GET', '/api/v1/portal/plugins', OMAR);
+  await call('operationsBadLimit', 'GET', '/api/v1/operations?limit=0', ADA);
   await call('anon', 'GET', '/api/v1/portal/me');
   return out;
 }
@@ -71,11 +77,15 @@ describe('simulated provider conformance with the exemplar service', async () =>
 
   it('enforces the same rules with the same codes and wording', () => {
     const code = (k: string) => (live[k].body as { code: string }).code;
-    expect([code('selfApprove'), code('forbidden'), code('stale'), code('invalid'), code('anon')]).toEqual(['FORBIDDEN', 'FORBIDDEN', 'REVISION_CONFLICT', 'VALIDATION_FAILED', 'UNAUTHENTICATED']);
+    const echo = (b: unknown) => (b as { items: { id: string }[] }).items.find((p) => p.id === 'echo');
+    const keys = ['selfApprove', 'forbidden', 'stale', 'invalid', 'anon', 'batchNotActive', 'batchMissing', 'batchEmpty', 'batchNoUse', 'operationsBadLimit'];
+    expect(keys.map(code)).toEqual(keys.map((k) => (real[k].body as { code: string }).code));
+    expect(live.pluginsApprover.body).toEqual(expect.objectContaining({ detail: false }));
+    expect(echo(live.pluginsApprover.body)).toEqual(echo(real.pluginsApprover.body));
     expect((live.failedTest.body as { current: { testResult: unknown } }).current.testResult).toEqual((real.failedTest.body as { current: { testResult: unknown } }).current.testResult);
     expect(live.kinds.body).toEqual(real.kinds.body);
-    const echo = (b: unknown) => (b as { items: { id: string }[] }).items.find((p) => p.id === 'echo');
     expect(echo(live.plugins.body)).toEqual(echo(real.plugins.body));
+    expect(Object.keys(live.batchEmpty.body as object).sort()).toEqual(Object.keys(real.batchEmpty.body as object).sort());
     expect((live.operation.body as { result: unknown }).result).toEqual((real.operation.body as { result: unknown }).result);
   });
 });

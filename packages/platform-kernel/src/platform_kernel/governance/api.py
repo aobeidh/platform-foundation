@@ -62,7 +62,7 @@ def governed_router(engine: GovernanceEngine, kind: str, authz: Authorizer, pref
     def action(name: str, dep: Any, fn: Any, needs_reason: bool = False) -> None:
         if needs_reason:
             @r.post(f"/{{id}}/{name}", dependencies=[Depends(dep)], summary=f"{name.capitalize()} a {kind}")
-            def with_reason(id: str, reason: str = Body(..., embed=True),
+            def with_reason(id: str, reason: str = Body(..., embed=True, min_length=1, max_length=500),
                             if_match: str | None = Header(default=None)) -> JSONResponse:
                 return _respond(fn(kind, id, _revision(if_match), reason))
         else:

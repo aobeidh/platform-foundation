@@ -308,6 +308,7 @@ export const rows: Row[] = [
   ['plug.required', 'required', 'إلزامي'],
   ['plug.optional', 'optional', 'اختياري'],
   ['plug.used', 'Used by {{n}} connections', 'يستخدمه {{n}} من الاتصالات'],
+  ['plug.withheld', 'Settings and secret names are shown to people who configure connections.', 'تظهر الإعدادات وأسماء الأسرار لمن يضبطون الاتصالات.'],
 
   // Access
   ['acc.eyebrow', 'Platform', 'المنصة'],

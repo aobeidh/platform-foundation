@@ -44,4 +44,19 @@ describe('simulated provider rules', () => {
     const other = await s.send({ method: 'GET', path: `/api/v1/operations/${op.id}`, headers: as('omar', 'integration-approver') });
     expect(other.status).toBe(404);
   });
+
+  it('stops a batch when the connection is paused, and says how far it got', async () => {
+    const s = new SimulatedTransport(seed, { persist: false, stepMs: 15 });
+    const admin = as('ada', 'integration-admin');
+    const list = (await s.send({ method: 'GET', path: '/api/v1/connections', headers: admin })).body as { items: { id: string; status: string; revision: number }[] };
+    const live = list.items.find((r) => r.status === 'active')!;
+    const op = (await s.send({ method: 'POST', path: `/api/v1/connections/${live.id}/send-batch`, headers: admin, body: { payloads: Array(20).fill({}) } })).body as { id: string };
+    await new Promise((r) => setTimeout(r, 40));
+    await s.send({ method: 'POST', path: `/api/v1/connections/${live.id}/pause`, headers: { ...admin, 'If-Match': `"${live.revision}"` } });
+    await new Promise((r) => setTimeout(r, 60));
+    const done = (await s.send({ method: 'GET', path: `/api/v1/operations/${op.id}`, headers: admin })).body as { status: string; error: { code: string; detail: string } };
+    expect(done.status).toBe('failed');
+    expect(done.error.code).toBe('CONNECTION_NOT_ACTIVE');
+    expect(done.error.detail).toMatch(/\d+ of 20 payloads were sent\./);
+  });
 });

@@ -284,8 +284,9 @@ class GovernanceEngine:
 
         return self._transition(kind, id, expected_revision, "retired", change, reason=reason)
 
-    def active_spec(self, kind: str, id: str) -> BaseModel | None:
-        """The spec products run on: the active version only, never a draft."""
+    def active_spec(self, kind: str, id: str, version: int | None = None) -> BaseModel | None:
+        """The spec products run on: the active version only, never a draft. With `version`, only while that
+        version is still the active one, so long-running work never switches configuration halfway."""
         k = self._kinds[kind]
         with self._uow() as uow:
             loaded = self._load(uow, k, id)
@@ -293,6 +294,8 @@ class GovernanceEngine:
                 return None
             record = loaded.value[0]
             if record.status != "active" or record.active_version is None:
+                return None
+            if version is not None and record.active_version != version:
                 return None
             v = self._store.version(uow, kind, id, record.active_version)
             return k.spec.model_validate(v.spec) if v else None
