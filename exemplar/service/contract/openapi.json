@@ -13,6 +13,25 @@
         "title": "Body_create_api_v1_connections_post",
         "type": "object"
       },
+      "Body_send_many_api_v1_connections__id__send_batch_post": {
+        "properties": {
+          "payloads": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Payloads",
+            "type": "array"
+          }
+        },
+        "required": [
+          "payloads"
+        ],
+        "title": "Body_send_many_api_v1_connections__id__send_batch_post",
+        "type": "object"
+      },
       "Body_send_payload_api_v1_connections__id__send_post": {
         "properties": {
           "payload": {
@@ -42,6 +61,8 @@
       "Body_with_reason_api_v1_connections__id__reject_post": {
         "properties": {
           "reason": {
+            "maxLength": 500,
+            "minLength": 1,
             "title": "Reason",
             "type": "string"
           }
@@ -677,6 +698,58 @@
         ]
       }
     },
+    "/api/v1/connections/{id}/send-batch": {
+      "post": {
+        "operationId": "send_many_api_v1_connections__id__send_batch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_send_many_api_v1_connections__id__send_batch_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Send Many Api V1 Connections  Id  Send Batch Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Send many payloads through a connection as a long-running operation",
+        "tags": [
+          "connections"
+        ]
+      }
+    },
     "/api/v1/connections/{id}/submit": {
       "post": {
         "operationId": "plain_api_v1_connections__id__submit_post",
@@ -833,6 +906,53 @@
         ]
       }
     },
+    "/api/v1/operations": {
+      "get": {
+        "operationId": "list_operations_api_v1_operations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Operations Api V1 Operations Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Long-running operations the caller may see, newest first",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
     "/api/v1/operations/{id}": {
       "get": {
         "operationId": "get_api_v1_operations__id__get",
@@ -918,6 +1038,75 @@
         "summary": "Ask a running operation to stop",
         "tags": [
           "operations"
+        ]
+      }
+    },
+    "/api/v1/portal/kinds": {
+      "get": {
+        "operationId": "kinds_api_v1_portal_kinds_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Kinds Api V1 Portal Kinds Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Governed kinds the caller may read, with their schema, lifecycle and capabilities",
+        "tags": [
+          "portal"
+        ]
+      }
+    },
+    "/api/v1/portal/me": {
+      "get": {
+        "operationId": "me_api_v1_portal_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Me Api V1 Portal Me Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "The caller, their tenant and the capabilities the portal may offer them",
+        "tags": [
+          "portal"
+        ]
+      }
+    },
+    "/api/v1/portal/plugins": {
+      "get": {
+        "operationId": "plugins_api_v1_portal_plugins_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Plugins Api V1 Portal Plugins Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Installed plugins by kind; configuration schemas only for people who configure",
+        "tags": [
+          "portal"
         ]
       }
     }

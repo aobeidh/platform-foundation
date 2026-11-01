@@ -12,8 +12,17 @@ class OperationStore(Protocol):
     def get_for_update(self, uow: Any, id: str) -> Operation | None:
         """Read and lock the row until the unit of work ends, so read-modify-write never loses an update."""
         ...
-    def save(self, uow: Any, op: Operation) -> None: ...
+    def save(self, uow: Any, op: Operation) -> None:
+        """Insert a new operation."""
+        ...
+    def update(self, uow: Any, op: Operation) -> None:
+        """Write the changing columns of an existing operation (never its input)."""
+        ...
     def unfinished(self, uow: Any) -> list[Operation]: ...
+    def recent(self, uow: Any, limit: int, created_by: str | None) -> list[Operation]:
+        """Newest first, within the unit of work's tenant scope (row-level security in PostgreSQL), and only the
+        given creator's when created_by is set."""
+        ...
 
 
 class MemoryOperationStore:
@@ -27,6 +36,21 @@ class MemoryOperationStore:
 
     def save(self, uow: Any, op: Operation) -> None:
         uow.table("operation")[op.id] = op
+
+    def update(self, uow: Any, op: Operation) -> None:
+        uow.table("operation")[op.id] = op
+
+    def recent(self, uow: Any, limit: int, created_by: str | None) -> list[Operation]:
+        ops = sorted(uow.table("operation").values(), key=lambda o: o.created_at, reverse=True)
+        if created_by is not None:
+            ops = [o for o in ops if o.created_by == created_by]
+        scope = getattr(uow, "platform_scope", False)
+        from .. import context as ctxmod
+
+        ctx = ctxmod.maybe_current()
+        if not scope and ctx is not None and not ctx.tenant.platform:
+            ops = [o for o in ops if o.tenant == ctx.tenant.tenant]
+        return ops[:limit]
 
     def unfinished(self, uow: Any) -> list[Operation]:
         return sorted((o for o in uow.table("operation").values() if o.status in RESUMABLE),
@@ -83,4 +107,25 @@ class PostgresOperationStore:
 
         rows = uow.connection.execute(text("select * from operation where status in ('pending', 'running', 'stalled') "
                                            "order by created_at"))
+        return [_row(r) for r in rows]
+
+    def update(self, uow: Any, op: Operation) -> None:
+        from sqlalchemy import text
+
+        uow.connection.execute(text(
+            "update operation set status = :status, progress = :progress, state = cast(:state as jsonb), "
+            "result = cast(:result as jsonb), error = cast(:error as jsonb), "
+            "cancel_requested = cancel_requested or :cancel, lease_owner = :lo, lease_until = :lu, "
+            "updated_at = :ua where id = :id"),
+            {"id": op.id, "status": op.status, "progress": op.progress, "state": json.dumps(op.state, default=str),
+             "result": json.dumps(op.result, default=str) if op.result is not None else None,
+             "error": json.dumps(op.error, default=str) if op.error is not None else None,
+             "cancel": op.cancel_requested, "lo": op.lease_owner, "lu": op.lease_until, "ua": op.updated_at})
+
+    def recent(self, uow: Any, limit: int, created_by: str | None) -> list[Operation]:
+        from sqlalchemy import text
+
+        where = "where created_by = :by " if created_by is not None else ""
+        rows = uow.connection.execute(text(f"select * from operation {where}order by created_at desc limit :n"),
+                                      {"n": limit, "by": created_by})
         return [_row(r) for r in rows]

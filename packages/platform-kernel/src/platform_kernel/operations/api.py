@@ -1,7 +1,7 @@
 """Operation status API and the 202 helper (P39)."""
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from ..core import DomainError, Result
@@ -25,6 +25,11 @@ def operations_router(runner: OperationRunner, prefix: str = "/api/v1") -> APIRo
         if not result.ok:
             raise DomainException(result.error)
         return result.value.to_json()
+
+    @r.get("", summary="Long-running operations the caller may see, newest first")
+    def list_operations(limit: int = Query(50, ge=1, le=200)) -> dict:
+        items = [op.to_json() for op in runner.recent(limit)]
+        return {"items": items, "total": len(items)}
 
     @r.get("/{id}", summary="Status, progress, result or error of a long-running operation")
     def get(id: str) -> dict:

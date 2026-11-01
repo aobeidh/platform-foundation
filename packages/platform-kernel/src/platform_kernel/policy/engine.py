@@ -37,6 +37,9 @@ class CapabilityCatalog:
     def __contains__(self, name: str) -> bool:
         return name in self._caps
 
+    def all(self) -> list[Capability]:
+        return sorted(self._caps.values(), key=lambda c: c.name)
+
     def names(self) -> frozenset[str]:
         return frozenset(self._caps)
 

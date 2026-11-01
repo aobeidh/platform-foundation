@@ -1,6 +1,6 @@
 [project]
 name = "platform-testing"
-version = "0.2.0"
+version = "0.3.0"
 description = "Contract suites and test helpers for products on the platform foundation."
 requires-python = ">=3.12"
 dependencies = ["platform-kernel", "pytest>=8.3", "jsonschema>=4.23"]

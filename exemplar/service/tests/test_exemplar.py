@@ -156,3 +156,89 @@ def test_activation_repository_contract(system):
         repo.add(uow, a2)
     with as_tenant("t1"), platform.uow() as uow:
         assert [a.event_id for a in repo.list(uow)] == [a1.event_id]
+
+
+def test_send_batch_runs_as_an_operation_with_progress(system):
+    platform, client = system
+    cid = make_active(client, prefix="b:")
+    r = client.post(f"/api/v1/connections/{cid}/send-batch", headers=ADMIN,
+                    json={"payloads": [{"n": i} for i in range(3)]})
+    assert r.status_code == 202 and r.headers["location"].startswith("/api/v1/operations/")
+    op_id = r.json()["id"]
+    platform.operations.wait(op_id)
+    done = client.get(r.headers["location"], headers=ADMIN).json()
+    assert done["status"] == "succeeded" and done["progress"] == 100 and done["result"] == {"sent": 3}
+    assert [i["id"] for i in client.get("/api/v1/operations", headers=ADMIN).json()["items"]] == [op_id]
+    assert client.get(r.headers["location"], headers=APPROVER).status_code == 404  # not theirs
+
+
+def test_portal_api_reflects_roles_kinds_and_plugins(system):
+    _, client = system
+    me = client.get("/api/v1/portal/me", headers=APPROVER).json()
+    assert {c["name"] for c in me["capabilities"]} == {"connections:read", "connections:approve"}
+    kinds = client.get("/api/v1/portal/kinds", headers=ADMIN).json()["items"]
+    assert [k["plural"] for k in kinds] == ["connections"]
+    plugins = client.get("/api/v1/portal/plugins", headers=ADMIN).json()["items"]
+    assert [(p["kind"], p["id"]) for p in plugins] == [("connector", "echo")]
+
+
+def test_api_shapes_match_the_web_kit_conformance_fixture():
+    """The web-kit's simulated provider is tested against this fixture; the live service must match it too."""
+    import importlib.util
+    import json
+    from pathlib import Path
+
+    loaded = importlib.util.spec_from_file_location("journey", Path(__file__).with_name("journey.py"))
+    journey = importlib.util.module_from_spec(loaded)
+    loaded.loader.exec_module(journey)
+    FIXTURE, run, shape = journey.FIXTURE, journey.run, journey.shape
+
+    settings = PlatformSettings(service="connections", allow_demo=True)
+    platform, app = build(settings)
+    try:
+        live = run(platform, TestClient(app))
+    finally:
+        platform.close()
+    recorded = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    assert {k: v["status"] for k, v in live.items()} == {k: v["status"] for k, v in recorded.items()}
+    for key in recorded:
+        assert shape(live[key]["body"]) == shape(recorded[key]["body"]), key
+
+
+def test_r3_r4_batch_checks_the_connection_up_front_and_stops_when_it_is_paused(system):
+    platform, client = system
+    gone = client.post("/api/v1/connections/missing/send-batch", headers=ADMIN, json={"payloads": [{}]})
+    assert gone.status_code == 404
+    draft = client.post("/api/v1/connections", headers=ADMIN, json={"spec": {
+        "name": "D", "connector": "echo", "connector_version": "1.0.0", "config": {"prefix": "d"}}}).json()
+    assert client.post(f"/api/v1/connections/{draft['id']}/send-batch", headers=ADMIN,
+                       json={"payloads": [{}]}).json()["code"] == "CONNECTION_NOT_ACTIVE"
+    cid = make_active(client, prefix="p:")
+    rec = client.get(f"/api/v1/connections/{cid}", headers=ADMIN)
+    client.post(f"/api/v1/connections/{cid}/pause", headers=ADMIN | etag(rec))
+    # The batch was accepted before the pause in real life; here start it through the runner with the pinned version.
+    from datetime import timedelta
+
+    from platform_kernel import context as ctxmod
+    from platform_kernel.context import Principal, RequestContext, TenantScope
+
+    pr = Principal("ada", roles=frozenset({"integration-admin"}), tenant="t1")
+    with ctxmod.use(RequestContext(principal=pr, tenant=TenantScope.resolve(pr), correlation_id="c",
+                                   deadline=datetime.now(UTC) + timedelta(seconds=30))):
+        op = platform.operations.start("connections.send-batch",
+                                       {"id": cid, "version": 1, "payloads": [{}, {}]}).value
+    platform.operations.wait(op.id)
+    failed = client.get(f"/api/v1/operations/{op.id}", headers=ADMIN).json()
+    assert failed["status"] == "failed" and failed["error"]["code"] == "CONNECTION_NOT_ACTIVE"
+    assert "0 of 2 payloads were sent" in failed["error"]["detail"]
+
+
+def test_r7_reject_needs_a_reason(system):
+    _, client = system
+    r = client.post("/api/v1/connections", headers=ADMIN, json={"spec": {
+        "name": "R", "connector": "echo", "connector_version": "1.0.0", "config": {"prefix": "r"}}})
+    cid = r.json()["id"]
+    r = client.post(f"/api/v1/connections/{cid}/test", headers=ADMIN | etag(r))
+    r = client.post(f"/api/v1/connections/{cid}/submit", headers=ADMIN | etag(r))
+    empty = client.post(f"/api/v1/connections/{cid}/reject", headers=APPROVER | etag(r), json={"reason": ""})
+    assert empty.status_code == 422

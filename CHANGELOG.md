@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.3.0 (unreleased)
+
+### platform-kernel
+- Added the portal API (ADR 0005): `GET /api/v1/portal/me`, `/portal/kinds` and `/portal/plugins`, served by every
+  app. Capabilities drive what a portal shows; the API still checks every call.
+- Added `GET /api/v1/operations` and `OperationRunner.recent()`: the operations the caller may see, newest first.
+- `CapabilityCatalog.all()`; `Platform.capabilities`.
+
+### Exemplar
+- `POST /api/v1/connections/{id}/send-batch` runs as a long-running operation with progress and cancellation.
+- `tests/journey.py` records the journey the web-kit's simulated provider is held to; a test keeps the live
+  service on the same shapes.
+
+### @platform/web-kit (new, `web/`)
+- Atomic design system: tokens, shadcn primitives restyled as atoms, molecules, organisms, templates, ECharts
+  charts and an SVG visualization kit; light and dark, English and Arabic (RTL); a Design lab page.
+- API port with HTTP and simulated providers, demo identities, TanStack Query hooks.
+- Governed-record kit: lifecycle gates, lifecycle actions that explain why they are disabled, forms generated from
+  JSON Schema, problem details, operation progress.
+- Exemplar portal: overview, connections, approvals, operations, activations, plugins, access.
+- shadcn registry (60 items) generated from source.
+
+### Review fixes before release
+- Operations list filters by creator in the store, so others' work cannot crowd out the caller's; `limit` is 1 to
+  200; new index (migration 0003). Status changes update only the changing columns; `Handle.step` saves state and
+  progress in one write.
+- `/portal/kinds` lists only kinds the caller may read; `/portal/plugins` needs read on some kind and withholds
+  configuration schemas and secret names from people who cannot configure.
+- Batches answer 404 or 409 at once for a missing or inactive connection, pin the version that runs them, stop
+  with how many payloads were sent when the connection is paused or changes version, and are documented as
+  at-least-once. A rejection needs a reason.
+- Web: the simulated provider matches these rules (the recorded journey now covers them); the detail page resets per
+  connection; batches send an Idempotency-Key; background work refreshes only operations; approvals honor
+  maker-checker settings.
+
 ## 0.2.0 (unreleased)
 
 ### platform-kernel

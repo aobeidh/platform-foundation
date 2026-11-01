@@ -1,0 +1,840 @@
+{
+ "me": {
+  "status": 200,
+  "body": {
+   "subject": "ada",
+   "kind": "user",
+   "tenant": "t1",
+   "platformScope": false,
+   "roles": [
+    "integration-admin"
+   ],
+   "onBehalfOf": null,
+   "capabilities": [
+    {
+     "name": "connections:read",
+     "display": {
+      "en": "Read connections",
+      "ar": "عرض الاتصالات"
+     }
+    },
+    {
+     "name": "connections:use",
+     "display": {
+      "en": "Send through connections",
+      "ar": "الإرسال عبر الاتصالات"
+     }
+    },
+    {
+     "name": "connections:write",
+     "display": {
+      "en": "Change connections",
+      "ar": "تعديل الاتصالات"
+     }
+    }
+   ],
+   "service": "connections",
+   "simulated": [
+    "identity",
+    "persistence",
+    "plugin-signatures",
+    "secrets"
+   ]
+  }
+ },
+ "kinds": {
+  "status": 200,
+  "body": {
+   "items": [
+    {
+     "kind": "connection",
+     "plural": "connections",
+     "display": {
+      "en": "Connection",
+      "ar": "اتصال"
+     },
+     "makerChecker": "policy",
+     "schema": {
+      "description": "The governed spec of a connection: which connector plugin, which version, and its configuration.",
+      "properties": {
+       "name": {
+        "maxLength": 80,
+        "minLength": 1,
+        "title": "Name",
+        "type": "string"
+       },
+       "connector": {
+        "title": "Connector",
+        "type": "string"
+       },
+       "connector_version": {
+        "title": "Connector Version",
+        "type": "string"
+       },
+       "config": {
+        "additionalProperties": true,
+        "title": "Config",
+        "type": "object"
+       }
+      },
+      "required": [
+       "name",
+       "connector",
+       "connector_version"
+      ],
+      "title": "ConnectionSpec",
+      "type": "object"
+     },
+     "capabilities": {
+      "read": "connections:read",
+      "write": "connections:write",
+      "approve": "connections:approve"
+     },
+     "tests": [
+      "config_valid",
+      "plugin_test"
+     ]
+    }
+   ],
+   "lifecycle": {
+    "versionStates": [
+     "draft",
+     "tested",
+     "submitted",
+     "active",
+     "superseded",
+     "retired"
+    ],
+    "recordStates": [
+     "draft",
+     "active",
+     "paused",
+     "retired"
+    ],
+    "transitions": [
+     {
+      "name": "test",
+      "from": [
+       "draft",
+       "tested"
+      ],
+      "to": "tested",
+      "capability": "write"
+     },
+     {
+      "name": "submit",
+      "from": [
+       "tested"
+      ],
+      "to": "submitted",
+      "capability": "write"
+     },
+     {
+      "name": "approve",
+      "from": [
+       "submitted"
+      ],
+      "to": "active",
+      "capability": "approve"
+     },
+     {
+      "name": "reject",
+      "from": [
+       "submitted"
+      ],
+      "to": "draft",
+      "capability": "approve",
+      "reason": true
+     },
+     {
+      "name": "pause",
+      "record": [
+       "active"
+      ],
+      "to": "paused",
+      "capability": "write"
+     },
+     {
+      "name": "resume",
+      "record": [
+       "paused"
+      ],
+      "to": "active",
+      "capability": "write"
+     },
+     {
+      "name": "retire",
+      "record": [
+       "draft",
+       "active",
+       "paused"
+      ],
+      "to": "retired",
+      "capability": "write"
+     }
+    ]
+   }
+  }
+ },
+ "plugins": {
+  "status": 200,
+  "body": {
+   "items": [
+    {
+     "kind": "connector",
+     "id": "echo",
+     "version": "1.0.0",
+     "spi": ">=0.1,<1",
+     "capabilities": [
+      "request-reply",
+      "sink"
+     ],
+     "display": {
+      "en": "Echo",
+      "ar": "صدى"
+     },
+     "publisher": "platform-foundation",
+     "configSchema": {
+      "type": "object",
+      "required": [
+       "prefix"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "prefix": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20
+       },
+       "uppercase": {
+        "type": "boolean",
+        "default": false
+       }
+      }
+     },
+     "secrets": []
+    }
+   ],
+   "total": 1,
+   "detail": true
+  }
+ },
+ "created": {
+  "status": 201,
+  "body": {
+   "id": "01a198ce-2b0e-775c-b722-8ba3e842a895",
+   "kind": "connection",
+   "tenant": "t1",
+   "status": "draft",
+   "revision": 1,
+   "currentVersion": 1,
+   "activeVersion": null,
+   "createdAt": "2026-11-01T20:30:10.702236+00:00",
+   "updatedAt": "2026-11-01T20:30:10.702236+00:00",
+   "current": {
+    "version": 1,
+    "status": "draft",
+    "spec": {
+     "name": "Customs gateway",
+     "connector": "echo",
+     "connector_version": "1.0.0",
+     "config": {
+      "prefix": "ZATCA"
+     }
+    },
+    "createdBy": "ada",
+    "submittedBy": null,
+    "approvedBy": null,
+    "testResult": null,
+    "editedBy": [
+     "ada"
+    ],
+    "makerChecker": true,
+    "createdAt": "2026-11-01T20:30:10.702236+00:00"
+   },
+   "active": null
+  }
+ },
+ "tested": {
+  "status": 200,
+  "body": {
+   "id": "01a198ce-2b0e-775c-b722-8ba3e842a895",
+   "kind": "connection",
+   "tenant": "t1",
+   "status": "draft",
+   "revision": 2,
+   "currentVersion": 1,
+   "activeVersion": null,
+   "createdAt": "2026-11-01T20:30:10.702236+00:00",
+   "updatedAt": "2026-11-01T20:30:10.747224+00:00",
+   "current": {
+    "version": 1,
+    "status": "tested",
+    "spec": {
+     "name": "Customs gateway",
+     "connector": "echo",
+     "connector_version": "1.0.0",
+     "config": {
+      "prefix": "ZATCA"
+     }
+    },
+    "createdBy": "ada",
+    "submittedBy": null,
+    "approvedBy": null,
+    "testResult": [
+     {
+      "name": "config",
+      "ok": true,
+      "detail": "The configuration matches the connector's schema."
+     },
+     {
+      "name": "reach",
+      "ok": true,
+      "detail": "Echo needs no network; it is always reachable."
+     }
+    ],
+    "editedBy": [
+     "ada"
+    ],
+    "makerChecker": true,
+    "createdAt": "2026-11-01T20:30:10.702236+00:00"
+   },
+   "active": null
+  }
+ },
+ "submitted": {
+  "status": 200,
+  "body": {
+   "id": "01a198ce-2b0e-775c-b722-8ba3e842a895",
+   "kind": "connection",
+   "tenant": "t1",
+   "status": "draft",
+   "revision": 3,
+   "currentVersion": 1,
+   "activeVersion": null,
+   "createdAt": "2026-11-01T20:30:10.702236+00:00",
+   "updatedAt": "2026-11-01T20:30:10.752987+00:00",
+   "current": {
+    "version": 1,
+    "status": "submitted",
+    "spec": {
+     "name": "Customs gateway",
+     "connector": "echo",
+     "connector_version": "1.0.0",
+     "config": {
+      "prefix": "ZATCA"
+     }
+    },
+    "createdBy": "ada",
+    "submittedBy": "ada",
+    "approvedBy": null,
+    "testResult": [
+     {
+      "name": "config",
+      "ok": true,
+      "detail": "The configuration matches the connector's schema."
+     },
+     {
+      "name": "reach",
+      "ok": true,
+      "detail": "Echo needs no network; it is always reachable."
+     }
+    ],
+    "editedBy": [
+     "ada"
+    ],
+    "makerChecker": true,
+    "createdAt": "2026-11-01T20:30:10.702236+00:00"
+   },
+   "active": null
+  }
+ },
+ "selfApprove": {
+  "status": 403,
+  "body": {
+   "type": "about:blank",
+   "title": "Not allowed",
+   "status": 403,
+   "code": "FORBIDDEN",
+   "detail": "connections:approve: no role grants this capability.",
+   "instance": "/api/v1/connections/01a198ce-2b0e-775c-b722-8ba3e842a895/approve",
+   "correlationId": "01a198ce-2b44-7072-95fc-22735185e1b1",
+   "errors": []
+  }
+ },
+ "approved": {
+  "status": 200,
+  "body": {
+   "id": "01a198ce-2b0e-775c-b722-8ba3e842a895",
+   "kind": "connection",
+   "tenant": "t1",
+   "status": "active",
+   "revision": 4,
+   "currentVersion": 1,
+   "activeVersion": 1,
+   "createdAt": "2026-11-01T20:30:10.702236+00:00",
+   "updatedAt": "2026-11-01T20:30:10.762677+00:00",
+   "current": {
+    "version": 1,
+    "status": "active",
+    "spec": {
+     "name": "Customs gateway",
+     "connector": "echo",
+     "connector_version": "1.0.0",
+     "config": {
+      "prefix": "ZATCA"
+     }
+    },
+    "createdBy": "ada",
+    "submittedBy": "ada",
+    "approvedBy": "omar",
+    "testResult": [
+     {
+      "name": "config",
+      "ok": true,
+      "detail": "The configuration matches the connector's schema."
+     },
+     {
+      "name": "reach",
+      "ok": true,
+      "detail": "Echo needs no network; it is always reachable."
+     }
+    ],
+    "editedBy": [
+     "ada"
+    ],
+    "makerChecker": true,
+    "createdAt": "2026-11-01T20:30:10.702236+00:00"
+   },
+   "active": {
+    "version": 1,
+    "status": "active",
+    "spec": {
+     "name": "Customs gateway",
+     "connector": "echo",
+     "connector_version": "1.0.0",
+     "config": {
+      "prefix": "ZATCA"
+     }
+    },
+    "createdBy": "ada",
+    "submittedBy": "ada",
+    "approvedBy": "omar",
+    "testResult": [
+     {
+      "name": "config",
+      "ok": true,
+      "detail": "The configuration matches the connector's schema."
+     },
+     {
+      "name": "reach",
+      "ok": true,
+      "detail": "Echo needs no network; it is always reachable."
+     }
+    ],
+    "editedBy": [
+     "ada"
+    ],
+    "makerChecker": true,
+    "createdAt": "2026-11-01T20:30:10.702236+00:00"
+   }
+  }
+ },
+ "activations": {
+  "status": 200,
+  "body": {
+   "items": [
+    {
+     "connectionId": "01a198ce-2b0e-775c-b722-8ba3e842a895",
+     "version": 1,
+     "tenant": "t1",
+     "activatedAt": "2026-11-01T20:30:10.762827+00:00",
+     "eventId": "01a198ce-2b4a-7486-b5c5-2288ae35a684"
+    }
+   ],
+   "total": 1
+  }
+ },
+ "send": {
+  "status": 200,
+  "body": {
+   "result": {
+    "echo": "ZATCAD-1",
+    "at": "2026-11-01T20:30:10.775207+00:00"
+   }
+  }
+ },
+ "accepted": {
+  "status": 202,
+  "body": {
+   "id": "01a198ce-2b61-7212-b4d9-b2cb5928546b",
+   "kind": "connections.send-batch",
+   "status": "pending",
+   "progress": 0,
+   "result": null,
+   "error": null,
+   "cancelRequested": false,
+   "createdBy": "ada",
+   "createdAt": "2026-11-01T20:30:10.785961+00:00",
+   "updatedAt": "2026-11-01T20:30:10.785961+00:00"
+  }
+ },
+ "operation": {
+  "status": 200,
+  "body": {
+   "id": "01a198ce-2b61-7212-b4d9-b2cb5928546b",
+   "kind": "connections.send-batch",
+   "status": "succeeded",
+   "progress": 100,
+   "result": {
+    "sent": 3
+   },
+   "error": null,
+   "cancelRequested": false,
+   "createdBy": "ada",
+   "createdAt": "2026-11-01T20:30:10.785961+00:00",
+   "updatedAt": "2026-11-01T20:30:10.794920+00:00"
+  }
+ },
+ "operations": {
+  "status": 200,
+  "body": {
+   "items": [
+    {
+     "id": "01a198ce-2b61-7212-b4d9-b2cb5928546b",
+     "kind": "connections.send-batch",
+     "status": "succeeded",
+     "progress": 100,
+     "result": {
+      "sent": 3
+     },
+     "error": null,
+     "cancelRequested": false,
+     "createdBy": "ada",
+     "createdAt": "2026-11-01T20:30:10.785961+00:00",
+     "updatedAt": "2026-11-01T20:30:10.794920+00:00"
+    }
+   ],
+   "total": 1
+  }
+ },
+ "versions": {
+  "status": 200,
+  "body": {
+   "items": [
+    {
+     "version": 1,
+     "status": "active",
+     "spec": {
+      "name": "Customs gateway",
+      "connector": "echo",
+      "connector_version": "1.0.0",
+      "config": {
+       "prefix": "ZATCA"
+      }
+     },
+     "createdBy": "ada",
+     "submittedBy": "ada",
+     "approvedBy": "omar"
+    }
+   ]
+  }
+ },
+ "list": {
+  "status": 200,
+  "body": {
+   "items": [
+    {
+     "id": "01a198ce-2b0e-775c-b722-8ba3e842a895",
+     "kind": "connection",
+     "tenant": "t1",
+     "status": "active",
+     "revision": 4,
+     "currentVersion": 1,
+     "activeVersion": 1,
+     "createdAt": "2026-11-01T20:30:10.702236+00:00",
+     "updatedAt": "2026-11-01T20:30:10.762677+00:00",
+     "current": {
+      "version": 1,
+      "status": "active",
+      "spec": {
+       "name": "Customs gateway",
+       "connector": "echo",
+       "connector_version": "1.0.0",
+       "config": {
+        "prefix": "ZATCA"
+       }
+      },
+      "createdBy": "ada",
+      "submittedBy": "ada",
+      "approvedBy": "omar",
+      "testResult": [
+       {
+        "name": "config",
+        "ok": true,
+        "detail": "The configuration matches the connector's schema."
+       },
+       {
+        "name": "reach",
+        "ok": true,
+        "detail": "Echo needs no network; it is always reachable."
+       }
+      ],
+      "editedBy": [
+       "ada"
+      ],
+      "makerChecker": true,
+      "createdAt": "2026-11-01T20:30:10.702236+00:00"
+     },
+     "active": {
+      "version": 1,
+      "status": "active",
+      "spec": {
+       "name": "Customs gateway",
+       "connector": "echo",
+       "connector_version": "1.0.0",
+       "config": {
+        "prefix": "ZATCA"
+       }
+      },
+      "createdBy": "ada",
+      "submittedBy": "ada",
+      "approvedBy": "omar",
+      "testResult": [
+       {
+        "name": "config",
+        "ok": true,
+        "detail": "The configuration matches the connector's schema."
+       },
+       {
+        "name": "reach",
+        "ok": true,
+        "detail": "Echo needs no network; it is always reachable."
+       }
+      ],
+      "editedBy": [
+       "ada"
+      ],
+      "makerChecker": true,
+      "createdAt": "2026-11-01T20:30:10.702236+00:00"
+     }
+    }
+   ],
+   "total": 1
+  }
+ },
+ "forbidden": {
+  "status": 403,
+  "body": {
+   "type": "about:blank",
+   "title": "Not allowed",
+   "status": 403,
+   "code": "FORBIDDEN",
+   "detail": "connections:write: no role grants this capability.",
+   "instance": "/api/v1/connections",
+   "correlationId": "01a198ce-2bb6-7098-839c-4e14c1d56439",
+   "errors": []
+  }
+ },
+ "failedTest": {
+  "status": 200,
+  "body": {
+   "id": "01a198ce-2bbc-700c-a84c-dd53a92202cb",
+   "kind": "connection",
+   "tenant": "t1",
+   "status": "draft",
+   "revision": 2,
+   "currentVersion": 1,
+   "activeVersion": null,
+   "createdAt": "2026-11-01T20:30:10.876155+00:00",
+   "updatedAt": "2026-11-01T20:30:10.883175+00:00",
+   "current": {
+    "version": 1,
+    "status": "draft",
+    "spec": {
+     "name": "x",
+     "connector": "echo",
+     "connector_version": "1.0.0",
+     "config": {
+      "prefix": " a"
+     }
+    },
+    "createdBy": "ada",
+    "submittedBy": null,
+    "approvedBy": null,
+    "testResult": [
+     {
+      "name": "config",
+      "ok": false,
+      "detail": "The connector configuration is not valid. /prefix: The prefix must not start or end with spaces."
+     },
+     {
+      "name": "reach",
+      "ok": true,
+      "detail": "Echo needs no network; it is always reachable."
+     }
+    ],
+    "editedBy": [
+     "ada"
+    ],
+    "makerChecker": true,
+    "createdAt": "2026-11-01T20:30:10.876155+00:00"
+   },
+   "active": null
+  }
+ },
+ "stale": {
+  "status": 409,
+  "body": {
+   "type": "about:blank",
+   "title": "Revision conflict",
+   "status": 409,
+   "code": "REVISION_CONFLICT",
+   "detail": "connection 01a198ce-2b0e-775c-b722-8ba3e842a895 is at revision 4, not 1. Reload and try again.",
+   "instance": "/api/v1/connections/01a198ce-2b0e-775c-b722-8ba3e842a895/pause",
+   "correlationId": "01a198ce-2bc6-71b5-8878-53bb1fd693c3",
+   "errors": []
+  }
+ },
+ "invalid": {
+  "status": 422,
+  "body": {
+   "type": "about:blank",
+   "title": "Validation failed",
+   "status": 422,
+   "code": "VALIDATION_FAILED",
+   "detail": "The request is not valid.",
+   "instance": "/api/v1/connections",
+   "correlationId": "01a198ce-2bcc-75ac-b7e1-93436a87aa16",
+   "errors": [
+    {
+     "pointer": "/spec/connector",
+     "code": "missing",
+     "message": "Field required"
+    },
+    {
+     "pointer": "/spec/connector_version",
+     "code": "missing",
+     "message": "Field required"
+    }
+   ]
+  }
+ },
+ "batchNotActive": {
+  "status": 409,
+  "body": {
+   "type": "about:blank",
+   "title": "Connection not active",
+   "status": 409,
+   "code": "CONNECTION_NOT_ACTIVE",
+   "detail": "Connection 01a198ce-2bbc-700c-a84c-dd53a92202cb is not active.",
+   "instance": "/api/v1/connections/01a198ce-2bbc-700c-a84c-dd53a92202cb/send-batch",
+   "correlationId": "01a198ce-2bd0-7524-ad4b-bf475fb087f2",
+   "errors": []
+  }
+ },
+ "batchMissing": {
+  "status": 404,
+  "body": {
+   "type": "about:blank",
+   "title": "Not found",
+   "status": 404,
+   "code": "NOT_FOUND",
+   "detail": "connection nope was not found.",
+   "instance": "/api/v1/connections/nope/send-batch",
+   "correlationId": "01a198ce-2bd6-72ed-b8d3-192dccfa2b1c",
+   "errors": []
+  }
+ },
+ "batchEmpty": {
+  "status": 422,
+  "body": {
+   "type": "about:blank",
+   "title": "Validation failed",
+   "status": 422,
+   "code": "VALIDATION_FAILED",
+   "detail": "The request is not valid.",
+   "instance": "/api/v1/connections/01a198ce-2b0e-775c-b722-8ba3e842a895/send-batch",
+   "correlationId": "01a198ce-2bda-775d-95b3-ed8c7f4ed9fa",
+   "errors": [
+    {
+     "pointer": "/payloads",
+     "code": "too_short",
+     "message": "List should have at least 1 item after validation, not 0"
+    }
+   ]
+  }
+ },
+ "batchNoUse": {
+  "status": 403,
+  "body": {
+   "type": "about:blank",
+   "title": "Not allowed",
+   "status": 403,
+   "code": "FORBIDDEN",
+   "detail": "connections:use: no role grants this capability.",
+   "instance": "/api/v1/connections/nope/send-batch",
+   "correlationId": "01a198ce-2bdf-719f-9d4b-8fc817044971",
+   "errors": []
+  }
+ },
+ "pluginsApprover": {
+  "status": 200,
+  "body": {
+   "items": [
+    {
+     "kind": "connector",
+     "id": "echo",
+     "version": "1.0.0",
+     "spi": ">=0.1,<1",
+     "capabilities": [
+      "request-reply",
+      "sink"
+     ],
+     "display": {
+      "en": "Echo",
+      "ar": "صدى"
+     },
+     "publisher": "platform-foundation",
+     "configSchema": {
+      "type": "object"
+     },
+     "secrets": []
+    }
+   ],
+   "total": 1,
+   "detail": false
+  }
+ },
+ "operationsBadLimit": {
+  "status": 422,
+  "body": {
+   "type": "about:blank",
+   "title": "Validation failed",
+   "status": 422,
+   "code": "VALIDATION_FAILED",
+   "detail": "The request is not valid.",
+   "instance": "/api/v1/operations",
+   "correlationId": "01a198ce-2be8-7004-808f-2be1c610159e",
+   "errors": [
+    {
+     "pointer": "/query/limit",
+     "code": "greater_than_equal",
+     "message": "Input should be greater than or equal to 1"
+    }
+   ]
+  }
+ },
+ "anon": {
+  "status": 401,
+  "body": {
+   "type": "about:blank",
+   "title": "Authentication required",
+   "status": 401,
+   "code": "UNAUTHENTICATED",
+   "detail": "Send a bearer token.",
+   "correlationId": "01a198ce-2bec-74d2-8229-90523f00ac23",
+   "errors": []
+  }
+ }
+}

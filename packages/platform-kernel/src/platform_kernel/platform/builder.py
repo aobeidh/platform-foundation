@@ -73,6 +73,7 @@ class Platform:
     operations: OperationRunner
     simulated: list[str]
     tokens: OAuthTokenService | None = None
+    capabilities: CapabilityCatalog = field(default_factory=CapabilityCatalog)
     _plugin_hosts: dict[str, PluginHost] = field(default_factory=dict)
     _migrations: list[Path] = field(default_factory=list)
     _engine: Any = None
@@ -131,8 +132,10 @@ class Platform:
 
     def create_app(self, routers: Iterable[APIRouter] = (), *, include_governed: bool = True,
                    readiness: dict[str, Callable[[], bool]] | None = None, version: str = "0.1.0") -> FastAPI:
+        from .portal import portal_router
+
         all_routers = (list(routers) + (self.governed_routers() if include_governed else [])
-                       + [operations_router(self.operations)])
+                       + [operations_router(self.operations), portal_router(self)])
         probes = dict(readiness or {})
         if self._engine is not None:
             probes.setdefault("database", self._database_ready)
@@ -405,7 +408,8 @@ class PlatformBuilder:
             verifier=verifier, policy=policy, authz=Authorizer(policy), secrets=secrets,
             egress=egress, governance=governance,
             consumers=consumers, relay=relay, expressions=expressions, operations=operations,
-            simulated=sorted(set(simulated)), tokens=tokens, _migrations=list(self._migrations), _engine=engine)
+            simulated=sorted(set(simulated)), tokens=tokens, capabilities=self._capabilities,
+            _migrations=list(self._migrations), _engine=engine)
         for pk in self._plugin_kinds:
             host = PluginHost(pk.kind, pk.spi_version, pk.spi, signature)
             if pk.group:
