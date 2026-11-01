@@ -77,4 +77,5 @@ def governed_router(engine: GovernanceEngine, kind: str, authz: Authorizer, pref
     action("pause", write, engine.pause)
     action("resume", write, engine.resume)
     action("retire", write, engine.retire)
+    action("discard", write, engine.discard)
     return r

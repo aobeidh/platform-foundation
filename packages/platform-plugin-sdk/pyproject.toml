@@ -1,6 +1,6 @@
 [project]
 name = "platform-plugin-sdk"
-version = "0.3.0"
+version = "0.4.0"
 description = "SPI types for plugins of the platform foundation. Strictest compatibility (P57)."
 requires-python = ">=3.12"
 dependencies = ["pydantic>=2.7"]

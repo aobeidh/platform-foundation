@@ -93,6 +93,9 @@ See [exemplar/service/src/exemplar_connections/wiring.py](exemplar/service/src/e
 
 ## Milestones
 
+**0.4:** approval policy in the governed-record engine (auto, single, maker-checker; required test), returned and
+discarded versions, specific lifecycle codes.
+
 **0.3:** the portal kit (`@platform/web-kit`) and the exemplar portal, the kernel's portal API, and an
 operation in the exemplar.
 
@@ -116,3 +119,4 @@ signatures, out-of-process plugin isolation, and OpenID discovery.
 - [ADR 0003](docs/adr/0003-identity-and-token-exchange.md): OIDC identity, and token exchange between services.
 - [ADR 0004](docs/adr/0004-operations-and-sagas.md): long-running operations and sagas on an in-process orchestrator.
 - [ADR 0005](docs/adr/0005-web-kit.md): the portal kit, the portal API, and the API as a port in the browser.
+- [ADR 0006](docs/adr/0006-approval-policy.md): approval policy (auto, single, maker-checker), returned and discarded versions.

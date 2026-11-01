@@ -54,6 +54,8 @@
       "ar": "اتصال"
      },
      "makerChecker": "policy",
+     "approval": "maker_checker",
+     "requireTest": true,
      "schema": {
       "description": "The governed spec of a connection: which connector plugin, which version, and its configuration.",
       "properties": {
@@ -101,9 +103,11 @@
      "draft",
      "tested",
      "submitted",
+     "returned",
      "active",
      "superseded",
-     "retired"
+     "retired",
+     "discarded"
     ],
     "recordStates": [
      "draft",
@@ -116,7 +120,8 @@
       "name": "test",
       "from": [
        "draft",
-       "tested"
+       "tested",
+       "returned"
       ],
       "to": "tested",
       "capability": "write"
@@ -124,7 +129,9 @@
      {
       "name": "submit",
       "from": [
-       "tested"
+       "draft",
+       "tested",
+       "returned"
       ],
       "to": "submitted",
       "capability": "write"
@@ -142,9 +149,19 @@
       "from": [
        "submitted"
       ],
-      "to": "draft",
+      "to": "returned",
       "capability": "approve",
       "reason": true
+     },
+     {
+      "name": "discard",
+      "from": [
+       "draft",
+       "tested",
+       "returned"
+      ],
+      "to": "discarded",
+      "capability": "write"
      },
      {
       "name": "pause",
@@ -222,15 +239,15 @@
  "created": {
   "status": 201,
   "body": {
-   "id": "01a198ce-2b0e-775c-b722-8ba3e842a895",
+   "id": "01a1991e-9dbf-7311-af9d-d424f109758f",
    "kind": "connection",
    "tenant": "t1",
    "status": "draft",
    "revision": 1,
    "currentVersion": 1,
    "activeVersion": null,
-   "createdAt": "2026-11-01T20:30:10.702236+00:00",
-   "updatedAt": "2026-11-01T20:30:10.702236+00:00",
+   "createdAt": "2026-11-01T21:58:02.943906+00:00",
+   "updatedAt": "2026-11-01T21:58:02.943906+00:00",
    "current": {
     "version": 1,
     "status": "draft",
@@ -249,8 +266,11 @@
     "editedBy": [
      "ada"
     ],
+    "testedBy": null,
+    "testedAt": null,
+    "reason": null,
     "makerChecker": true,
-    "createdAt": "2026-11-01T20:30:10.702236+00:00"
+    "createdAt": "2026-11-01T21:58:02.943906+00:00"
    },
    "active": null
   }
@@ -258,15 +278,15 @@
  "tested": {
   "status": 200,
   "body": {
-   "id": "01a198ce-2b0e-775c-b722-8ba3e842a895",
+   "id": "01a1991e-9dbf-7311-af9d-d424f109758f",
    "kind": "connection",
    "tenant": "t1",
    "status": "draft",
    "revision": 2,
    "currentVersion": 1,
    "activeVersion": null,
-   "createdAt": "2026-11-01T20:30:10.702236+00:00",
-   "updatedAt": "2026-11-01T20:30:10.747224+00:00",
+   "createdAt": "2026-11-01T21:58:02.943906+00:00",
+   "updatedAt": "2026-11-01T21:58:02.978384+00:00",
    "current": {
     "version": 1,
     "status": "tested",
@@ -296,8 +316,11 @@
     "editedBy": [
      "ada"
     ],
+    "testedBy": "ada",
+    "testedAt": "2026-11-01T21:58:02.978384+00:00",
+    "reason": null,
     "makerChecker": true,
-    "createdAt": "2026-11-01T20:30:10.702236+00:00"
+    "createdAt": "2026-11-01T21:58:02.943906+00:00"
    },
    "active": null
   }
@@ -305,15 +328,15 @@
  "submitted": {
   "status": 200,
   "body": {
-   "id": "01a198ce-2b0e-775c-b722-8ba3e842a895",
+   "id": "01a1991e-9dbf-7311-af9d-d424f109758f",
    "kind": "connection",
    "tenant": "t1",
    "status": "draft",
    "revision": 3,
    "currentVersion": 1,
    "activeVersion": null,
-   "createdAt": "2026-11-01T20:30:10.702236+00:00",
-   "updatedAt": "2026-11-01T20:30:10.752987+00:00",
+   "createdAt": "2026-11-01T21:58:02.943906+00:00",
+   "updatedAt": "2026-11-01T21:58:02.982493+00:00",
    "current": {
     "version": 1,
     "status": "submitted",
@@ -343,8 +366,11 @@
     "editedBy": [
      "ada"
     ],
+    "testedBy": "ada",
+    "testedAt": "2026-11-01T21:58:02.978384+00:00",
+    "reason": null,
     "makerChecker": true,
-    "createdAt": "2026-11-01T20:30:10.702236+00:00"
+    "createdAt": "2026-11-01T21:58:02.943906+00:00"
    },
    "active": null
   }
@@ -357,23 +383,23 @@
    "status": 403,
    "code": "FORBIDDEN",
    "detail": "connections:approve: no role grants this capability.",
-   "instance": "/api/v1/connections/01a198ce-2b0e-775c-b722-8ba3e842a895/approve",
-   "correlationId": "01a198ce-2b44-7072-95fc-22735185e1b1",
+   "instance": "/api/v1/connections/01a1991e-9dbf-7311-af9d-d424f109758f/approve",
+   "correlationId": "01a1991e-9de9-7533-b237-7d7923695234",
    "errors": []
   }
  },
  "approved": {
   "status": 200,
   "body": {
-   "id": "01a198ce-2b0e-775c-b722-8ba3e842a895",
+   "id": "01a1991e-9dbf-7311-af9d-d424f109758f",
    "kind": "connection",
    "tenant": "t1",
    "status": "active",
    "revision": 4,
    "currentVersion": 1,
    "activeVersion": 1,
-   "createdAt": "2026-11-01T20:30:10.702236+00:00",
-   "updatedAt": "2026-11-01T20:30:10.762677+00:00",
+   "createdAt": "2026-11-01T21:58:02.943906+00:00",
+   "updatedAt": "2026-11-01T21:58:02.989506+00:00",
    "current": {
     "version": 1,
     "status": "active",
@@ -403,8 +429,11 @@
     "editedBy": [
      "ada"
     ],
+    "testedBy": "ada",
+    "testedAt": "2026-11-01T21:58:02.978384+00:00",
+    "reason": null,
     "makerChecker": true,
-    "createdAt": "2026-11-01T20:30:10.702236+00:00"
+    "createdAt": "2026-11-01T21:58:02.943906+00:00"
    },
    "active": {
     "version": 1,
@@ -435,8 +464,11 @@
     "editedBy": [
      "ada"
     ],
+    "testedBy": "ada",
+    "testedAt": "2026-11-01T21:58:02.978384+00:00",
+    "reason": null,
     "makerChecker": true,
-    "createdAt": "2026-11-01T20:30:10.702236+00:00"
+    "createdAt": "2026-11-01T21:58:02.943906+00:00"
    }
   }
  },
@@ -445,11 +477,11 @@
   "body": {
    "items": [
     {
-     "connectionId": "01a198ce-2b0e-775c-b722-8ba3e842a895",
+     "connectionId": "01a1991e-9dbf-7311-af9d-d424f109758f",
      "version": 1,
      "tenant": "t1",
-     "activatedAt": "2026-11-01T20:30:10.762827+00:00",
-     "eventId": "01a198ce-2b4a-7486-b5c5-2288ae35a684"
+     "activatedAt": "2026-11-01T21:58:02.989679+00:00",
+     "eventId": "01a1991e-9ded-7115-9e09-26aecd788c4b"
     }
    ],
    "total": 1
@@ -460,14 +492,14 @@
   "body": {
    "result": {
     "echo": "ZATCAD-1",
-    "at": "2026-11-01T20:30:10.775207+00:00"
+    "at": "2026-11-01T21:58:02.997862+00:00"
    }
   }
  },
  "accepted": {
   "status": 202,
   "body": {
-   "id": "01a198ce-2b61-7212-b4d9-b2cb5928546b",
+   "id": "01a1991e-9df9-77e3-8235-811f0d26eb96",
    "kind": "connections.send-batch",
    "status": "pending",
    "progress": 0,
@@ -475,14 +507,14 @@
    "error": null,
    "cancelRequested": false,
    "createdBy": "ada",
-   "createdAt": "2026-11-01T20:30:10.785961+00:00",
-   "updatedAt": "2026-11-01T20:30:10.785961+00:00"
+   "createdAt": "2026-11-01T21:58:03.001870+00:00",
+   "updatedAt": "2026-11-01T21:58:03.001870+00:00"
   }
  },
  "operation": {
   "status": 200,
   "body": {
-   "id": "01a198ce-2b61-7212-b4d9-b2cb5928546b",
+   "id": "01a1991e-9df9-77e3-8235-811f0d26eb96",
    "kind": "connections.send-batch",
    "status": "succeeded",
    "progress": 100,
@@ -492,8 +524,8 @@
    "error": null,
    "cancelRequested": false,
    "createdBy": "ada",
-   "createdAt": "2026-11-01T20:30:10.785961+00:00",
-   "updatedAt": "2026-11-01T20:30:10.794920+00:00"
+   "createdAt": "2026-11-01T21:58:03.001870+00:00",
+   "updatedAt": "2026-11-01T21:58:03.008235+00:00"
   }
  },
  "operations": {
@@ -501,7 +533,7 @@
   "body": {
    "items": [
     {
-     "id": "01a198ce-2b61-7212-b4d9-b2cb5928546b",
+     "id": "01a1991e-9df9-77e3-8235-811f0d26eb96",
      "kind": "connections.send-batch",
      "status": "succeeded",
      "progress": 100,
@@ -511,8 +543,8 @@
      "error": null,
      "cancelRequested": false,
      "createdBy": "ada",
-     "createdAt": "2026-11-01T20:30:10.785961+00:00",
-     "updatedAt": "2026-11-01T20:30:10.794920+00:00"
+     "createdAt": "2026-11-01T21:58:03.001870+00:00",
+     "updatedAt": "2026-11-01T21:58:03.008235+00:00"
     }
    ],
    "total": 1
@@ -545,15 +577,15 @@
   "body": {
    "items": [
     {
-     "id": "01a198ce-2b0e-775c-b722-8ba3e842a895",
+     "id": "01a1991e-9dbf-7311-af9d-d424f109758f",
      "kind": "connection",
      "tenant": "t1",
      "status": "active",
      "revision": 4,
      "currentVersion": 1,
      "activeVersion": 1,
-     "createdAt": "2026-11-01T20:30:10.702236+00:00",
-     "updatedAt": "2026-11-01T20:30:10.762677+00:00",
+     "createdAt": "2026-11-01T21:58:02.943906+00:00",
+     "updatedAt": "2026-11-01T21:58:02.989506+00:00",
      "current": {
       "version": 1,
       "status": "active",
@@ -583,8 +615,11 @@
       "editedBy": [
        "ada"
       ],
+      "testedBy": "ada",
+      "testedAt": "2026-11-01T21:58:02.978384+00:00",
+      "reason": null,
       "makerChecker": true,
-      "createdAt": "2026-11-01T20:30:10.702236+00:00"
+      "createdAt": "2026-11-01T21:58:02.943906+00:00"
      },
      "active": {
       "version": 1,
@@ -615,8 +650,11 @@
       "editedBy": [
        "ada"
       ],
+      "testedBy": "ada",
+      "testedAt": "2026-11-01T21:58:02.978384+00:00",
+      "reason": null,
       "makerChecker": true,
-      "createdAt": "2026-11-01T20:30:10.702236+00:00"
+      "createdAt": "2026-11-01T21:58:02.943906+00:00"
      }
     }
    ],
@@ -632,22 +670,22 @@
    "code": "FORBIDDEN",
    "detail": "connections:write: no role grants this capability.",
    "instance": "/api/v1/connections",
-   "correlationId": "01a198ce-2bb6-7098-839c-4e14c1d56439",
+   "correlationId": "01a1991e-9e47-768c-8fd8-002a6e2220d5",
    "errors": []
   }
  },
  "failedTest": {
   "status": 200,
   "body": {
-   "id": "01a198ce-2bbc-700c-a84c-dd53a92202cb",
+   "id": "01a1991e-9e4c-7732-b5fe-28acedefc3b5",
    "kind": "connection",
    "tenant": "t1",
    "status": "draft",
    "revision": 2,
    "currentVersion": 1,
    "activeVersion": null,
-   "createdAt": "2026-11-01T20:30:10.876155+00:00",
-   "updatedAt": "2026-11-01T20:30:10.883175+00:00",
+   "createdAt": "2026-11-01T21:58:03.084445+00:00",
+   "updatedAt": "2026-11-01T21:58:03.089637+00:00",
    "current": {
     "version": 1,
     "status": "draft",
@@ -677,8 +715,11 @@
     "editedBy": [
      "ada"
     ],
+    "testedBy": "ada",
+    "testedAt": "2026-11-01T21:58:03.089637+00:00",
+    "reason": null,
     "makerChecker": true,
-    "createdAt": "2026-11-01T20:30:10.876155+00:00"
+    "createdAt": "2026-11-01T21:58:03.084445+00:00"
    },
    "active": null
   }
@@ -690,9 +731,9 @@
    "title": "Revision conflict",
    "status": 409,
    "code": "REVISION_CONFLICT",
-   "detail": "connection 01a198ce-2b0e-775c-b722-8ba3e842a895 is at revision 4, not 1. Reload and try again.",
-   "instance": "/api/v1/connections/01a198ce-2b0e-775c-b722-8ba3e842a895/pause",
-   "correlationId": "01a198ce-2bc6-71b5-8878-53bb1fd693c3",
+   "detail": "connection 01a1991e-9dbf-7311-af9d-d424f109758f is at revision 4, not 1. Reload and try again.",
+   "instance": "/api/v1/connections/01a1991e-9dbf-7311-af9d-d424f109758f/pause",
+   "correlationId": "01a1991e-9e54-7432-ae2a-e76d2d43a7c1",
    "errors": []
   }
  },
@@ -705,7 +746,7 @@
    "code": "VALIDATION_FAILED",
    "detail": "The request is not valid.",
    "instance": "/api/v1/connections",
-   "correlationId": "01a198ce-2bcc-75ac-b7e1-93436a87aa16",
+   "correlationId": "01a1991e-9e58-7248-b6b3-67c2b6df316c",
    "errors": [
     {
      "pointer": "/spec/connector",
@@ -727,9 +768,9 @@
    "title": "Connection not active",
    "status": 409,
    "code": "CONNECTION_NOT_ACTIVE",
-   "detail": "Connection 01a198ce-2bbc-700c-a84c-dd53a92202cb is not active.",
-   "instance": "/api/v1/connections/01a198ce-2bbc-700c-a84c-dd53a92202cb/send-batch",
-   "correlationId": "01a198ce-2bd0-7524-ad4b-bf475fb087f2",
+   "detail": "Connection 01a1991e-9e4c-7732-b5fe-28acedefc3b5 is not active.",
+   "instance": "/api/v1/connections/01a1991e-9e4c-7732-b5fe-28acedefc3b5/send-batch",
+   "correlationId": "01a1991e-9e5b-755a-89b5-a0454b498e73",
    "errors": []
   }
  },
@@ -742,7 +783,7 @@
    "code": "NOT_FOUND",
    "detail": "connection nope was not found.",
    "instance": "/api/v1/connections/nope/send-batch",
-   "correlationId": "01a198ce-2bd6-72ed-b8d3-192dccfa2b1c",
+   "correlationId": "01a1991e-9e60-7163-9ec0-51836784c81a",
    "errors": []
   }
  },
@@ -754,8 +795,8 @@
    "status": 422,
    "code": "VALIDATION_FAILED",
    "detail": "The request is not valid.",
-   "instance": "/api/v1/connections/01a198ce-2b0e-775c-b722-8ba3e842a895/send-batch",
-   "correlationId": "01a198ce-2bda-775d-95b3-ed8c7f4ed9fa",
+   "instance": "/api/v1/connections/01a1991e-9dbf-7311-af9d-d424f109758f/send-batch",
+   "correlationId": "01a1991e-9e63-7747-a1af-8b98231b0d16",
    "errors": [
     {
      "pointer": "/payloads",
@@ -774,7 +815,7 @@
    "code": "FORBIDDEN",
    "detail": "connections:use: no role grants this capability.",
    "instance": "/api/v1/connections/nope/send-batch",
-   "correlationId": "01a198ce-2bdf-719f-9d4b-8fc817044971",
+   "correlationId": "01a1991e-9e66-70d4-ba3e-d141d4a48790",
    "errors": []
   }
  },
@@ -815,7 +856,7 @@
    "code": "VALIDATION_FAILED",
    "detail": "The request is not valid.",
    "instance": "/api/v1/operations",
-   "correlationId": "01a198ce-2be8-7004-808f-2be1c610159e",
+   "correlationId": "01a1991e-9e6d-7074-be4c-34af6fb1a871",
    "errors": [
     {
      "pointer": "/query/limit",
@@ -823,6 +864,110 @@
      "message": "Input should be greater than or equal to 1"
     }
    ]
+  }
+ },
+ "returned": {
+  "status": 200,
+  "body": {
+   "id": "01a1991e-9e70-70b8-bdc0-b72492b455f1",
+   "kind": "connection",
+   "tenant": "t1",
+   "status": "draft",
+   "revision": 4,
+   "currentVersion": 1,
+   "activeVersion": null,
+   "createdAt": "2026-11-01T21:58:03.120860+00:00",
+   "updatedAt": "2026-11-01T21:58:03.134594+00:00",
+   "current": {
+    "version": 1,
+    "status": "returned",
+    "spec": {
+     "name": "Returned",
+     "connector": "echo",
+     "connector_version": "1.0.0",
+     "config": {
+      "prefix": "R"
+     }
+    },
+    "createdBy": "ada",
+    "submittedBy": null,
+    "approvedBy": null,
+    "testResult": null,
+    "editedBy": [
+     "ada"
+    ],
+    "testedBy": null,
+    "testedAt": null,
+    "reason": "wrong prefix",
+    "makerChecker": true,
+    "createdAt": "2026-11-01T21:58:03.120860+00:00"
+   },
+   "active": null
+  }
+ },
+ "approveReturned": {
+  "status": 409,
+  "body": {
+   "type": "about:blank",
+   "title": "Nothing to approve",
+   "status": 409,
+   "code": "NOT_SUBMITTED",
+   "detail": "Nothing is waiting for approval.",
+   "instance": "/api/v1/connections/01a1991e-9e70-70b8-bdc0-b72492b455f1/approve",
+   "correlationId": "01a1991e-9e81-7773-a48b-3910846f8b40",
+   "errors": []
+  }
+ },
+ "discarded": {
+  "status": 200,
+  "body": {
+   "id": "01a1991e-9e70-70b8-bdc0-b72492b455f1",
+   "kind": "connection",
+   "tenant": "t1",
+   "status": "retired",
+   "revision": 5,
+   "currentVersion": 1,
+   "activeVersion": null,
+   "createdAt": "2026-11-01T21:58:03.120860+00:00",
+   "updatedAt": "2026-11-01T21:58:03.143153+00:00",
+   "current": {
+    "version": 1,
+    "status": "discarded",
+    "spec": {
+     "name": "Returned",
+     "connector": "echo",
+     "connector_version": "1.0.0",
+     "config": {
+      "prefix": "R"
+     }
+    },
+    "createdBy": "ada",
+    "submittedBy": null,
+    "approvedBy": null,
+    "testResult": null,
+    "editedBy": [
+     "ada"
+    ],
+    "testedBy": null,
+    "testedAt": null,
+    "reason": "wrong prefix",
+    "makerChecker": true,
+    "createdAt": "2026-11-01T21:58:03.120860+00:00"
+   },
+   "active": null
+  }
+ },
+ "editRetired": {
+  "status": 409,
+  "body": {
+   "type": "about:blank",
+   "title": "Retired",
+   "status": 409,
+   "code": "RECORD_RETIRED",
+   "detail": "connection 01a1991e-9e70-70b8-bdc0-b72492b455f1 is retired; it cannot change.",
+   "instance": "/api/v1/connections/01a1991e-9e70-70b8-bdc0-b72492b455f1/draft",
+   "correlationId": "01a1991e-9e89-77de-8d63-880875a5a40b",
+   "errors": []
   }
  },
  "anon": {
@@ -833,7 +978,7 @@
    "status": 401,
    "code": "UNAUTHENTICATED",
    "detail": "Send a bearer token.",
-   "correlationId": "01a198ce-2bec-74d2-8229-90523f00ac23",
+   "correlationId": "01a1991e-9e8d-756a-9419-f345d66df403",
    "errors": []
   }
  }

@@ -134,9 +134,9 @@ class _Governance:
             assert v.current.status == "retired"
         with as_user("checker"):
             r = engine.approve("conn", v.record.id, v.record.revision)
-            assert r.error.code == "INVALID_TRANSITION"
+            assert r.error.code == "RECORD_RETIRED"
             assert engine.active_spec("conn", v.record.id) is None
-            assert engine.test("conn", v.record.id, v.record.revision).error.code == "INVALID_TRANSITION"
+            assert engine.test("conn", v.record.id, v.record.revision).error.code == "RECORD_RETIRED"
 
     def test_duplicate_id_is_a_conflict_not_a_crash(self, engine):
         with as_user("alice"):

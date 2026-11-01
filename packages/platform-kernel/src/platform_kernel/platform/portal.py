@@ -18,13 +18,14 @@ if TYPE_CHECKING:
     from .builder import Platform
 
 LIFECYCLE = {
-    "versionStates": ["draft", "tested", "submitted", "active", "superseded", "retired"],
+    "versionStates": ["draft", "tested", "submitted", "returned", "active", "superseded", "retired", "discarded"],
     "recordStates": ["draft", "active", "paused", "retired"],
     "transitions": [
-        {"name": "test", "from": ["draft", "tested"], "to": "tested", "capability": "write"},
-        {"name": "submit", "from": ["tested"], "to": "submitted", "capability": "write"},
+        {"name": "test", "from": ["draft", "tested", "returned"], "to": "tested", "capability": "write"},
+        {"name": "submit", "from": ["draft", "tested", "returned"], "to": "submitted", "capability": "write"},
         {"name": "approve", "from": ["submitted"], "to": "active", "capability": "approve"},
-        {"name": "reject", "from": ["submitted"], "to": "draft", "capability": "approve", "reason": True},
+        {"name": "reject", "from": ["submitted"], "to": "returned", "capability": "approve", "reason": True},
+        {"name": "discard", "from": ["draft", "tested", "returned"], "to": "discarded", "capability": "write"},
         {"name": "pause", "record": ["active"], "to": "paused", "capability": "write"},
         {"name": "resume", "record": ["paused"], "to": "active", "capability": "write"},
         {"name": "retire", "record": ["draft", "active", "paused"], "to": "retired", "capability": "write"},
@@ -59,8 +60,10 @@ def portal_router(platform: Platform, prefix: str = "/api/v1") -> APIRouter:
         for k in platform.governance.kinds():
             if k.read not in allowed:
                 continue
+            rule = platform.governance.rule_for(k.kind)
             items.append({"kind": k.kind, "plural": k.plural, "display": k.display,
-                          "makerChecker": k.maker_checker, "schema": k.spec.model_json_schema(),
+                          "makerChecker": k.maker_checker, "approval": rule.approval, "requireTest": rule.require_test,
+                          "schema": k.json_schema or k.spec.model_json_schema(),
                           "capabilities": {"read": k.read, "write": k.write, "approve": k.approve},
                           "tests": [getattr(t, "__name__", "check") for t in k.tests]})
         return {"items": items, "lifecycle": LIFECYCLE}

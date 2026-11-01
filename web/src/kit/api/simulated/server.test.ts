@@ -29,7 +29,7 @@ describe('simulated provider rules', () => {
     const retired = await s.send({ method: 'POST', path: `/api/v1/connections/${pending.id}/retire`, headers: { ...as('ada', 'integration-admin'), 'If-Match': `"${pending.revision}"` } });
     expect((retired.body as { status: string; current: { status: string } }).current.status).toBe('retired');
     const again = await s.send({ method: 'POST', path: `/api/v1/connections/${pending.id}/test`, headers: { ...as('ada', 'integration-admin'), 'If-Match': `"${pending.revision + 1}"` } });
-    expect((again.body as { code: string }).code).toBe('INVALID_TRANSITION');
+    expect((again.body as { code: string }).code).toBe('RECORD_RETIRED');
   });
 
   it('cancels a running batch operation cooperatively', async () => {
@@ -58,5 +58,22 @@ describe('simulated provider rules', () => {
     expect(done.status).toBe('failed');
     expect(done.error.code).toBe('CONNECTION_NOT_ACTIVE');
     expect(done.error.detail).toMatch(/\d+ of 20 payloads were sent\./);
+  });
+
+  it('follows the approval rule of the kind: auto activates on submit, single lets the maker approve', async () => {
+    const make = (approval: 'auto' | 'single', requireTest: boolean) => new SimulatedTransport({ ...seed,
+      kinds: { ...seed.kinds, items: seed.kinds.items.map((k) => ({ ...k, approval, requireTest })) },
+      initial: () => ({ records: [], operations: [], activations: [] }) }, { persist: false });
+    const admin = as('ada', 'integration-admin');
+    const auto = make('auto', true);
+    let r = (await auto.send({ method: 'POST', path: '/api/v1/connections', headers: admin, body: spec })).body as { id: string; revision: number };
+    r = (await auto.send({ method: 'POST', path: `/api/v1/connections/${r.id}/test`, headers: { ...admin, 'If-Match': `"${r.revision}"` } })).body as typeof r;
+    const live = (await auto.send({ method: 'POST', path: `/api/v1/connections/${r.id}/submit`, headers: { ...admin, 'If-Match': `"${r.revision}"` } })).body as { status: string; activeVersion: number };
+    expect([live.status, live.activeVersion]).toEqual(['active', 1]);
+    const single = make('single', false);
+    const both = as('max', 'integration-admin');
+    let s = (await single.send({ method: 'POST', path: '/api/v1/connections', headers: both, body: spec })).body as { id: string; revision: number; current: { status: string } };
+    s = (await single.send({ method: 'POST', path: `/api/v1/connections/${s.id}/submit`, headers: { ...both, 'If-Match': `"${s.revision}"` } })).body as typeof s;
+    expect(s.current.status).toBe('submitted');
   });
 });

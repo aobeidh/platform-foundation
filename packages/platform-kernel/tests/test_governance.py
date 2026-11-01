@@ -100,7 +100,7 @@ class _Lifecycle:
     def test_pause_resume_retire(self, engine):
         with as_user("maker"):
             v = engine.create("rate", {"name": "vm", "amount": 1}).value
-            assert engine.pause("rate", v.record.id, v.record.revision).error.code == "INVALID_TRANSITION"
+            assert engine.pause("rate", v.record.id, v.record.revision).error.code == "NOT_ACTIVE"
             v = engine.test("rate", v.record.id, v.record.revision).value
             v = engine.submit("rate", v.record.id, v.record.revision).value
         with as_user("checker"):

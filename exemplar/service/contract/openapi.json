@@ -344,6 +344,62 @@
         ]
       }
     },
+    "/api/v1/connections/{id}/discard": {
+      "post": {
+        "operationId": "plain_api_v1_connections__id__discard_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Discard a connection",
+        "tags": [
+          "connections"
+        ]
+      }
+    },
     "/api/v1/connections/{id}/draft": {
       "put": {
         "operationId": "update_api_v1_connections__id__draft_put",

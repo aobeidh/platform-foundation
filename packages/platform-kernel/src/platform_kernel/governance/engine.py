@@ -14,7 +14,16 @@ from ..audit import AuditEntry
 from ..core import Clock, ConcurrencyConflict, DomainError, Err, Ok, Result, SystemClock, new_id
 from ..messaging import make_event
 from ..persistence import UnitOfWorkFactory
-from .model import GovernedKind, GovernedView, Record, Version
+from .model import (
+    PENDING,
+    ApprovalPolicy,
+    ApprovalRule,
+    GovernedKind,
+    GovernedView,
+    Record,
+    StaticApprovalPolicy,
+    Version,
+)
 from .store import GovernedStore
 
 GovResult = Result[GovernedView, DomainError]
@@ -22,9 +31,14 @@ GovResult = Result[GovernedView, DomainError]
 
 class GovernanceEngine:
     def __init__(self, *, uow: UnitOfWorkFactory, store: GovernedStore, source: str,
-                 maker_checker_policy: bool = True, clock: Clock | None = None) -> None:
+                 maker_checker_policy: bool = True, clock: Clock | None = None,
+                 policy: ApprovalPolicy | None = None) -> None:
+        """`policy` decides what submitting means per kind (auto, single, maker_checker; require_test). Without it,
+        `maker_checker_policy` keeps the 0.3 behavior: maker-checker with a required test, or single approval."""
         self._uow, self._store, self._source = uow, store, source
         self._policy = maker_checker_policy
+        self._rules: ApprovalPolicy = policy or StaticApprovalPolicy(
+            ApprovalRule("maker_checker" if maker_checker_policy else "single", True))
         self._clock = clock or SystemClock()
         self._kinds: dict[str, GovernedKind] = {}
 
@@ -41,8 +55,18 @@ class GovernanceEngine:
     def kind(self, name: str) -> GovernedKind:
         return self._kinds[name]
 
+    def rule_for(self, kind: str) -> ApprovalRule:
+        """The rule in force for a kind: the policy's, within the floor or ceiling the kind declares."""
+        rule = self._rules.rule_for(kind)
+        k = self._kinds[kind]
+        if k.maker_checker == "always" and rule.approval != "maker_checker":
+            return ApprovalRule("maker_checker", True)
+        if k.maker_checker == "never" and rule.approval == "maker_checker":
+            return ApprovalRule("single", rule.require_test)
+        return rule
+
     def _maker_checker(self, k: GovernedKind) -> bool:
-        return {"always": True, "never": False, "policy": self._policy}[k.maker_checker]
+        return self.rule_for(k.kind).approval == "maker_checker"
 
     # Helpers ----------------------------------------------------------------------------------------------------
 
@@ -99,7 +123,7 @@ class GovernanceEngine:
                     return loaded
                 record, current = loaded.value
                 if record.status == "retired":
-                    return Err(DomainError("INVALID_TRANSITION", f"{kind} {id} is retired; it cannot change."))
+                    return Err(DomainError("RECORD_RETIRED", f"{kind} {id} is retired; it cannot change."))
                 if record.revision != expected_revision:
                     return Err(DomainError("REVISION_CONFLICT", f"{kind} {id} is at revision {record.revision}, "
                                                                 f"not {expected_revision}. Reload and try again."))
@@ -169,13 +193,15 @@ class GovernanceEngine:
 
         def change(uow: Any, k: GovernedKind, r: Record, cur: Version, now: datetime):
             if r.status == "retired":
-                return Err(DomainError("INVALID_TRANSITION", f"{kind} {id} is retired."))
+                return Err(DomainError("RECORD_RETIRED", f"{kind} {id} is retired; it cannot change."))
             if cur.status == "submitted":
-                return Err(DomainError("INVALID_TRANSITION", "The version is waiting for approval. Reject it first."))
-            if cur.status in ("draft", "tested"):
+                return Err(DomainError("DRAFT_SUBMITTED", "The version is waiting for approval. It can change once it "
+                                                          "is returned."))
+            if cur.status in PENDING:
                 # Any edit sends the draft back, clears the test result and records the editor (P14).
                 editors = cur.edited_by if self._actor() in cur.edited_by else (*cur.edited_by, self._actor())
-                return Ok((r, [cur.with_(spec=valid.value, status="draft", test_result=None, edited_by=editors)]))
+                return Ok((r, [cur.with_(spec=valid.value, status="draft", test_result=None, tested_by=None,
+                                         tested_at=None, reason=None, edited_by=editors)]))
             # Current version is active: start a new draft; the active version keeps running.
             new = Version(kind=kind, id=id, version=r.current_version + 1, tenant=r.tenant, status="draft",
                           spec=valid.value, maker_checker=self._maker_checker(k), created_by=self._actor(),
@@ -193,12 +219,14 @@ class GovernanceEngine:
                 return loaded
             record, cur = loaded.value
         if record.status == "retired":
-            return Err(DomainError("INVALID_TRANSITION", f"{kind} {id} is retired; it cannot change."))
+            return Err(DomainError("RECORD_RETIRED", f"{kind} {id} is retired; it cannot change."))
         if record.revision != expected_revision:
             return Err(DomainError("REVISION_CONFLICT", f"{kind} {id} is at revision {record.revision}, "
                                                         f"not {expected_revision}. Reload and try again."))
-        if cur.status not in ("draft", "tested"):
-            return Err(DomainError("INVALID_TRANSITION", f"Only a draft can be tested; this one is {cur.status}."))
+        if cur.status == "submitted":
+            return Err(DomainError("DRAFT_SUBMITTED", "The version is waiting for approval; it cannot be tested now."))
+        if cur.status not in PENDING:
+            return Err(DomainError("NO_DRAFT", "There is no draft to test."))
         spec = k.spec.model_validate(cur.spec)
         checks: list[Check] = []
         for t in k.tests:
@@ -211,51 +239,80 @@ class GovernanceEngine:
         tested_version = cur.version
 
         def change(uow: Any, k: GovernedKind, r: Record, now_cur: Version, now: datetime):
-            if now_cur.version != tested_version or now_cur.status not in ("draft", "tested"):
+            if now_cur.version != tested_version or now_cur.status not in PENDING:
                 return Err(DomainError("REVISION_CONFLICT", "The draft changed while it was being tested."))
-            return Ok((r, [now_cur.with_(status="tested" if passed else "draft", test_result=result)]))
+            return Ok((r, [now_cur.with_(status="tested" if passed else "draft", test_result=result,
+                                         tested_by=self._actor(), tested_at=now, reason=None)]))
 
         return self._transition(kind, id, expected_revision, "tested", change)
 
-    def submit(self, kind: str, id: str, expected_revision: int) -> GovResult:
-        def change(uow: Any, k: GovernedKind, r: Record, cur: Version, now: datetime):
-            if cur.status != "tested":
-                return Err(DomainError("NOT_TESTED", "Run the test and fix any failed checks before submitting."))
-            return Ok((r, [cur.with_(status="submitted", submitted_by=self._actor())]))
+    def _activate(self, uow: Any, k: GovernedKind, r: Record, cur: Version, actor: str):
+        versions = [cur.with_(status="active", approved_by=actor)]
+        if r.active_version and r.active_version != cur.version:
+            previous = self._store.version(uow, k.kind, r.id, r.active_version)
+            if previous is not None:
+                versions.insert(0, previous.with_(status="superseded"))
+        status = "paused" if r.status == "paused" else "active"
+        return r.with_(active_version=cur.version, status=status), versions
 
-        return self._transition(kind, id, expected_revision, "submitted", change)
+    def submit(self, kind: str, id: str, expected_revision: int) -> GovResult:
+        """Under `auto` approval, submitting activates the version in the same unit of work, and both the
+        submitted and the approved transitions are recorded (consumers of approved events still see it)."""
+        rule = self.rule_for(kind)
+
+        def change(uow: Any, k: GovernedKind, r: Record, cur: Version, now: datetime):
+            if cur.status == "submitted":
+                return Err(DomainError("DRAFT_SUBMITTED", "The version is already submitted."))
+            if cur.status not in PENDING:
+                return Err(DomainError("NO_DRAFT", "There is no draft to submit."))
+            if rule.require_test and cur.status != "tested":
+                return Err(DomainError("NOT_TESTED", "Run the test and fix any failed checks before submitting."))
+            submitted = cur.with_(status="submitted", submitted_by=self._actor(), reason=None,
+                                  maker_checker=rule.approval == "maker_checker")
+            if rule.approval == "auto":
+                record, versions = self._activate(uow, k, r, submitted, self._actor())
+                return Ok((record, versions))
+            return Ok((r, [submitted]))
+
+        result = self._transition(kind, id, expected_revision, "submitted", change)
+        if result.ok and rule.approval == "auto" and result.value.record.active_version == result.value.current.version:
+            with self._uow() as uow:
+                self._record_change(uow, self._kinds[kind], "approved", result.value.record, None,
+                                    {"status": result.value.record.status, "version": result.value.current.version},
+                                    "auto approval")
+        return result
 
     def approve(self, kind: str, id: str, expected_revision: int) -> GovResult:
+        rule = self.rule_for(kind)
+
         def change(uow: Any, k: GovernedKind, r: Record, cur: Version, now: datetime):
             if cur.status != "submitted":
-                return Err(DomainError("INVALID_TRANSITION", f"Only a submitted version can be approved; this one "
-                                                             f"is {cur.status}."))
+                return Err(DomainError("NOT_SUBMITTED", "Nothing is waiting for approval."))
             actor = self._actor()
-            if cur.maker_checker and actor in cur.authors:
+            # The stricter of the rule at submission and the rule now applies.
+            strict = cur.maker_checker or rule.approval == "maker_checker"
+            if strict and actor in cur.authors:
                 return Err(DomainError("MAKER_CHECKER", "Someone who did not create, edit or submit this version "
                                                         "must approve it."))
-            versions = [cur.with_(status="active", approved_by=actor)]
-            if r.active_version and r.active_version != cur.version:
-                previous = self._store.version(uow, k.kind, r.id, r.active_version)
-                if previous is not None:
-                    versions.insert(0, previous.with_(status="superseded"))
-            status = "paused" if r.status == "paused" else "active"
-            return Ok((r.with_(active_version=cur.version, status=status), versions))
+            record, versions = self._activate(uow, k, r, cur.with_(maker_checker=strict), actor)
+            return Ok((record, versions))
 
         return self._transition(kind, id, expected_revision, "approved", change)
 
     def reject(self, kind: str, id: str, expected_revision: int, reason: str) -> GovResult:
         def change(uow: Any, k: GovernedKind, r: Record, cur: Version, now: datetime):
             if cur.status != "submitted":
-                return Err(DomainError("INVALID_TRANSITION", "Only a submitted version can be rejected."))
-            return Ok((r, [cur.with_(status="draft", submitted_by=None, test_result=None)]))
+                return Err(DomainError("NOT_SUBMITTED", "Nothing is waiting for approval."))
+            # Returned to its makers with the reason; the old test no longer counts.
+            return Ok((r, [cur.with_(status="returned", submitted_by=None, test_result=None, tested_by=None,
+                                     tested_at=None, reason=reason)]))
 
         return self._transition(kind, id, expected_revision, "rejected", change, reason=reason)
 
     def pause(self, kind: str, id: str, expected_revision: int, reason: str | None = None) -> GovResult:
         def change(uow: Any, k: GovernedKind, r: Record, cur: Version, now: datetime):
             if r.status != "active":
-                return Err(DomainError("INVALID_TRANSITION", f"Only an active record can be paused; it is {r.status}."))
+                return Err(DomainError("NOT_ACTIVE", f"Only an active record can be paused; it is {r.status}."))
             return Ok((r.with_(status="paused"), []))
 
         return self._transition(kind, id, expected_revision, "paused", change, reason=reason)
@@ -263,7 +320,7 @@ class GovernanceEngine:
     def resume(self, kind: str, id: str, expected_revision: int) -> GovResult:
         def change(uow: Any, k: GovernedKind, r: Record, cur: Version, now: datetime):
             if r.status != "paused":
-                return Err(DomainError("INVALID_TRANSITION", f"Only a paused record can be resumed; it is {r.status}."))
+                return Err(DomainError("NOT_PAUSED", f"Only a paused record can be resumed; it is {r.status}."))
             return Ok((r.with_(status="active"), []))
 
         return self._transition(kind, id, expected_revision, "resumed", change)
@@ -271,7 +328,7 @@ class GovernanceEngine:
     def retire(self, kind: str, id: str, expected_revision: int, reason: str | None = None) -> GovResult:
         def change(uow: Any, k: GovernedKind, r: Record, cur: Version, now: datetime):
             if r.status == "retired":
-                return Err(DomainError("INVALID_TRANSITION", f"{kind} {id} is already retired."))
+                return Err(DomainError("RECORD_RETIRED", f"{kind} {id} is already retired."))
             versions = []
             if r.active_version:
                 active = self._store.version(uow, k.kind, r.id, r.active_version)
@@ -283,6 +340,21 @@ class GovernanceEngine:
             return Ok((r.with_(status="retired"), versions))
 
         return self._transition(kind, id, expected_revision, "retired", change, reason=reason)
+
+    def discard(self, kind: str, id: str, expected_revision: int) -> GovResult:
+        """Drop the pending version. A record that never ran is retired by it; an active one keeps running."""
+        def change(uow: Any, k: GovernedKind, r: Record, cur: Version, now: datetime):
+            if cur.status == "submitted":
+                return Err(DomainError("DRAFT_SUBMITTED", "The version is waiting for approval. Ask the approver to "
+                                                          "return it first."))
+            if cur.status not in PENDING:
+                return Err(DomainError("NO_DRAFT", "There is no draft to discard."))
+            versions = [cur.with_(status="discarded")]
+            if r.active_version:
+                return Ok((r.with_(current_version=r.active_version), versions))
+            return Ok((r.with_(status="retired"), versions))
+
+        return self._transition(kind, id, expected_revision, "discarded", change)
 
     def active_spec(self, kind: str, id: str, version: int | None = None) -> BaseModel | None:
         """The spec products run on: the active version only, never a draft. With `version`, only while that

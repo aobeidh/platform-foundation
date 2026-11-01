@@ -22,7 +22,7 @@ import { useSetStage } from '@/app/stage';
 import { ConnectionForm } from './connection-form';
 import { display, pluginFor, styleOf } from './shared';
 
-const STAGE: Record<string, string> = { draft: 'draft', tested: 'submit', submitted: 'approve', active: 'run', superseded: 'run', retired: 'retire' };
+const STAGE: Record<string, string> = { draft: 'draft', returned: 'change', tested: 'submit', submitted: 'approve', active: 'run', superseded: 'run', retired: 'retire', discarded: 'retire' };
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="grid grid-cols-[140px_minmax(0,1fr)] gap-3 border-b border-line py-2 text-13 last:border-0"><dt className="text-muted">{label}</dt><dd className="min-w-0 text-fg">{children}</dd></div>;
@@ -140,7 +140,7 @@ export function ConnectionDetailPage() {
             <Row label={t('detail.editedBy')}>{v.editedBy.join(', ')}</Row>
             <Row label={t('col.submittedBy')}>{v.submittedBy ?? '—'}</Row>
             <Row label={t('col.approvedBy')}>{v.approvedBy ?? '—'}</Row>
-            <Row label={t('detail.makerChecker')}>{v.makerChecker ? t('detail.makerChecker.on') : t('detail.makerChecker.off')}</Row>
+            <Row label={t('detail.approval')}>{kind ? t(`approval.${kind.approval}`) : '—'}</Row>
           </dl></CardContent>
         </Card>
       </div>
@@ -159,7 +159,8 @@ export function ConnectionDetailPage() {
           <CardHeader><CardTitle>{t('detail.gates')}</CardTitle>
             {r.activeVersion && r.activeVersion !== r.currentVersion && <CardDescription>{t('detail.liveNote', { v: r.activeVersion, c: r.currentVersion })}</CardDescription>}</CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <LifecycleGates record={r} />
+            {v.status === 'returned' && v.reason && <p className="rounded-[10px] bg-warn/10 px-3 py-2 text-13 text-warn">{t('detail.returned', { reason: v.reason })}</p>}
+            <LifecycleGates record={r} requireTest={kind?.requireTest ?? true} />
             {kind && <GovernedActions record={r} kind={kind} onDone={(text, ok) => { setNotice(text ? { text, ok } : null); if (!text) void record.refetch(); }} />}
             {notice && <p role="status" className={notice.ok ? 'text-13 text-good' : 'text-13 text-bad'}>{notice.text}</p>}
           </CardContent>
