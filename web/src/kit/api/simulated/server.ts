@@ -275,7 +275,7 @@ export class SimulatedTransport implements Transport {
       const stored: SimStoredRecord = {
         record: { id, kind: kind.kind, tenant: c.tenant, status: 'draft', revision: 1, currentVersion: 1, activeVersion: null, createdAt: now, updatedAt: now },
         versions: [{ version: 1, status: 'draft', spec, createdBy: c.subject, submittedBy: null, approvedBy: null, testResult: null,
-          editedBy: [c.subject], makerChecker: false, createdAt: now, testedBy: null, testedAt: null, reason: null }],
+          editedBy: [c.subject], makerChecker: (kind.approval ?? 'maker_checker') === 'maker_checker', createdAt: now, testedBy: null, testedAt: null, reason: null }],
       };
       this.state.records.push(stored);
       return this.respond(stored, 201);
@@ -319,9 +319,9 @@ export class SimulatedTransport implements Transport {
           Object.assign(cur, { spec: spec!, status: 'draft', testResult: null, testedBy: null, testedAt: null, reason: null,
             editedBy: cur.editedBy.includes(c.subject) ? cur.editedBy : [...cur.editedBy, c.subject] });
         } else {
-          const v = r.currentVersion + 1;
+          const v = Math.max(...stored.versions.map((x) => x.version)) + 1; // after every version, discarded ones included
           stored.versions.push({ version: v, status: 'draft', spec: spec!, createdBy: c.subject, submittedBy: null, approvedBy: null,
-            testResult: null, editedBy: [c.subject], makerChecker: false, createdAt: now, testedBy: null, testedAt: null, reason: null });
+            testResult: null, editedBy: [c.subject], makerChecker: rule.approval === 'maker_checker', createdAt: now, testedBy: null, testedAt: null, reason: null });
           r.currentVersion = v;
         }
         break;
@@ -337,11 +337,13 @@ export class SimulatedTransport implements Transport {
         if (cur.status === 'submitted') throw new Fail('DRAFT_SUBMITTED', 'The version is already submitted.');
         if (!pending) throw new Fail('NO_DRAFT', 'There is no draft to submit.');
         if (rule.requireTest && cur.status !== 'tested') throw new Fail('NOT_TESTED', 'Run the test and fix any failed checks before submitting.');
+        if (cur.testResult?.some((x) => !x.ok)) throw new Fail('NOT_TESTED', 'The last test failed. Fix the draft and test it again.');
         Object.assign(cur, { status: 'submitted', submittedBy: c.subject, reason: null, makerChecker: rule.approval === 'maker_checker' });
         if (rule.approval === 'auto') activate(c.subject);
         break;
       case 'approve': {
         if (cur.status !== 'submitted') throw new Fail('NOT_SUBMITTED', 'Nothing is waiting for approval.');
+        if (cur.testResult?.some((x) => !x.ok) || (rule.requireTest && cur.testResult == null)) throw new Fail('NOT_TESTED', 'This version has no passing test, which approval now needs.');
         const strict = cur.makerChecker || rule.approval === 'maker_checker';
         const authors = new Set([cur.createdBy, ...cur.editedBy, ...(cur.submittedBy ? [cur.submittedBy] : [])]);
         if (strict && authors.has(c.subject)) throw new Fail('MAKER_CHECKER', 'Someone who did not create, edit or submit this version must approve it.');

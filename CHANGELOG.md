@@ -12,6 +12,13 @@
   `RECORD_RETIRED`.
 - `/portal/kinds` reports each kind's approval rule; `GovernedKind.json_schema` lets a product serve its own schema.
 
+### Review fixes before release
+- Auto approval records submitted and approved in one unit of work (F9).
+- A draft after a discarded one gets a new number; discarded versions stay in history.
+- A failed test blocks submit and approval even when tests are not required; approval needs a test when the rule in
+  force requires one.
+- Retiring withdraws a returned version too.
+
 ### @platform/web-kit
 - Discard action, returned versions with their reason, submit and approve enabled by each kind's rule; the simulated
   provider follows the approval policy; the recorded journey covers return and discard.

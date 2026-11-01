@@ -76,4 +76,21 @@ describe('simulated provider rules', () => {
     s = (await single.send({ method: 'POST', path: `/api/v1/connections/${s.id}/submit`, headers: { ...both, 'If-Match': `"${s.revision}"` } })).body as typeof s;
     expect(s.current.status).toBe('submitted');
   });
+
+  it('numbers a draft after a discarded one, keeping the discarded version in history', async () => {
+    const s = sim();
+    const admin = as('ada', 'integration-admin');
+    const h = (r: { revision: number }) => ({ ...admin, 'If-Match': `"${r.revision}"` });
+    const list = (await s.send({ method: 'GET', path: '/api/v1/connections', headers: admin })).body as { items: { id: string; status: string; revision: number; current: { status: string; spec: unknown } }[] };
+    const live = list.items.find((r) => r.status === 'active' && r.current.status === 'active')!;
+    let r = (await s.send({ method: 'PUT', path: `/api/v1/connections/${live.id}/draft`, headers: h(live), body: { spec: live.current.spec } })).body as typeof live & { currentVersion: number };
+    const first = r.currentVersion;
+    r = (await s.send({ method: 'POST', path: `/api/v1/connections/${live.id}/discard`, headers: h(r) })).body as typeof r;
+    r = (await s.send({ method: 'PUT', path: `/api/v1/connections/${live.id}/draft`, headers: h(r), body: { spec: live.current.spec } })).body as typeof r;
+    expect(r.currentVersion).toBe(first + 1);
+    const versions = (await s.send({ method: 'GET', path: `/api/v1/connections/${live.id}/versions`, headers: admin })).body as { items: { version: number; status: string }[] };
+    expect(versions.items.filter((v) => v.version >= first).map((v) => v.status)).toEqual(['discarded', 'draft']);
+    const tested = await s.send({ method: 'POST', path: `/api/v1/connections/${live.id}/test`, headers: h(r) });
+    expect(tested.status).toBe(200);
+  });
 });

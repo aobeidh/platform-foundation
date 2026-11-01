@@ -27,7 +27,7 @@ export function useAvailability(record: GovernedRecord<object>, kind: KindInfo):
   const strict = v.makerChecker || kind.approval === 'maker_checker';
   const list: { name: Transition['name']; applies: boolean; ok: boolean; why?: string }[] = [
     { name: 'test', applies: pending, ok: true },
-    { name: 'submit', applies: pending, ok: !kind.requireTest || v.status === 'tested', why: t('act.why.state', { status }) },
+    { name: 'submit', applies: pending, ok: (!kind.requireTest || v.status === 'tested') && !v.testResult?.some((c) => !c.ok), why: t('act.why.state', { status }) },
     { name: 'approve', applies: v.status === 'submitted', ok: !(strict && me.data && authors.has(me.data.subject)), why: t('act.why.author') },
     { name: 'reject', applies: v.status === 'submitted', ok: true },
     { name: 'pause', applies: record.status === 'active', ok: true },

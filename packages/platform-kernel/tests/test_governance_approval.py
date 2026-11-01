@@ -181,3 +181,79 @@ class TestPostgresApproval(_Approval):
         from platform_kernel.persistence.postgres import PostgresOutboxReader
 
         return lambda: [r.envelope.type for r in PostgresOutboxReader(pg_engine, pg_schema).claim(100)]
+
+
+class _Review04:
+    def test_r1_a_draft_after_a_discarded_one_gets_a_new_number(self, uow, store):
+        e = GovernanceEngine(uow=uow, store=store, source="svc",
+                             policy=StaticApprovalPolicy(ApprovalRule("single", False)))
+        e.register(kind())
+        with as_user("bob"):
+            v = e.create("item", {"value": 1}).value
+            v = e.submit("item", v.record.id, v.record.revision).value
+            v = e.approve("item", v.record.id, v.record.revision).value
+            v = e.update_draft("item", v.record.id, {"value": 2}, v.record.revision).value
+            v = e.discard("item", v.record.id, v.record.revision).value
+        with as_user("carol"):
+            v = e.update_draft("item", v.record.id, {"value": 3}, v.record.revision).value
+            assert v.current.version == 3 and v.current.created_by == "carol"
+            versions = e.versions("item", v.record.id).value
+        assert [(x.version, x.status, x.created_by) for x in versions] == [
+            (1, "active", "bob"), (2, "discarded", "bob"), (3, "draft", "carol")]
+
+    def test_r2_auto_approval_is_recorded_atomically(self, uow, store, monkeypatch):
+        e = GovernanceEngine(uow=uow, store=store, source="svc",
+                             policy=StaticApprovalPolicy(ApprovalRule("auto", False)))
+        e.register(kind())
+        original = e._record_change
+
+        def failing(uow_, k, transition, *a, **kw):
+            if transition == "approved":
+                raise RuntimeError("audit store down")
+            return original(uow_, k, transition, *a, **kw)
+
+        with as_user("alice"):
+            v = e.create("item", {"value": 1}).value
+            monkeypatch.setattr(e, "_record_change", failing)
+            with pytest.raises(RuntimeError):
+                e.submit("item", v.record.id, v.record.revision)
+            monkeypatch.setattr(e, "_record_change", original)
+            after = e.get("item", v.record.id).value
+        assert (after.record.status, after.record.active_version, after.current.status) == ("draft", None, "draft")
+
+    def test_r3_r4_failed_or_missing_tests_block_submit_and_approval(self, uow, store):
+        policy = StaticApprovalPolicy(ApprovalRule("single", False))
+        e = GovernanceEngine(uow=uow, store=store, source="svc", policy=policy)
+        e.register(kind())
+        with as_user("alice"):
+            v = e.create("item", {"value": -1}).value
+            v = e.test("item", v.record.id, v.record.revision).value
+            assert e.submit("item", v.record.id, v.record.revision).error.code == "NOT_TESTED"
+            w = e.create("item", {"value": -2}, id="w").value
+            w = e.submit("item", "w", w.record.revision).value
+        policy.kinds["item"] = ApprovalRule("maker_checker", True)
+        with as_user("bob"):
+            assert e.approve("item", "w", w.record.revision).error.code == "NOT_TESTED"
+
+    def test_r5_retiring_withdraws_a_returned_version(self, uow, store):
+        e = GovernanceEngine(uow=uow, store=store, source="svc",
+                             policy=StaticApprovalPolicy(ApprovalRule("maker_checker", True)))
+        e.register(kind())
+        run(e, [
+            ("create", "alice", 1, ("draft", None, "draft")),
+            ("test", "alice", None, ("draft", None, "tested")),
+            ("submit", "alice", None, ("draft", None, "submitted")),
+            ("reject", "bob", "wrong value", ("draft", None, "returned")),
+            ("retire", "alice", "not needed", ("retired", None, "retired")),
+        ])
+
+
+class TestMemoryReview04(_Review04):
+    uow = TestMemoryApproval.uow
+    store = TestMemoryApproval.store
+
+
+@requires_postgres
+class TestPostgresReview04(_Review04):
+    uow = TestPostgresApproval.uow
+    store = TestPostgresApproval.store
