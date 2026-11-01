@@ -1,0 +1,73 @@
+{
+  "description": "What a plugin declares about itself. Validated by the host before registration (P11).",
+  "properties": {
+    "capabilities": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Capabilities",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "config_migrations_from": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Config Migrations From",
+      "type": "array"
+    },
+    "config_schema": {
+      "additionalProperties": true,
+      "title": "Config Schema",
+      "type": "object"
+    },
+    "display": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Display",
+      "type": "object"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "title": "Kind",
+      "type": "string"
+    },
+    "publisher": {
+      "title": "Publisher",
+      "type": "string"
+    },
+    "secrets": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Secrets",
+      "type": "array"
+    },
+    "spi": {
+      "description": "PEP 440 specifier of compatible host SPI versions, for example '>=0.1,<1'",
+      "title": "Spi",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "spi",
+    "kind",
+    "display",
+    "publisher"
+  ],
+  "title": "Descriptor",
+  "type": "object"
+}

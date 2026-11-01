@@ -1,0 +1,28 @@
+# Service manifest (spec/manifest.schema.json). Makes P1, P4, P7, P9, P18 and P24 checkable by `pk check`.
+name: connections
+tier: P
+owner: platform-foundation
+package: exemplar_connections
+schema: connections
+app: exemplar_connections.wiring:build
+contracts:
+  http: contract/openapi.json
+errors: src/exemplar_connections/errors.yaml
+migrations: migrations
+calls: []
+publishes:
+  - connections.connection.created.v1
+  - connections.connection.draft_updated.v1
+  - connections.connection.tested.v1
+  - connections.connection.submitted.v1
+  - connections.connection.approved.v1
+  - connections.connection.rejected.v1
+  - connections.connection.paused.v1
+  - connections.connection.resumed.v1
+  - connections.connection.retired.v1
+consumes:
+  - connections.connection.approved.v1
+interfaces:
+  ActivationRepository: {providers: [memory, postgres], default: memory}
+plugins_hosted: [connector]
+residency: {runs_in: [primary-region], data: [records, audit]}

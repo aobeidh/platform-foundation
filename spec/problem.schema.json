@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "ProblemFieldError": {
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "pointer": {
+          "title": "Pointer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pointer",
+        "code",
+        "message"
+      ],
+      "title": "ProblemFieldError",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "code": {
+      "title": "Code",
+      "type": "string"
+    },
+    "correlationId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Correlationid"
+    },
+    "detail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Detail"
+    },
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/ProblemFieldError"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "instance": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Instance"
+    },
+    "status": {
+      "title": "Status",
+      "type": "integer"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "type": {
+      "default": "about:blank",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "status",
+    "code"
+  ],
+  "title": "Problem",
+  "type": "object"
+}

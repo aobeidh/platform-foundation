@@ -1,0 +1,13 @@
+[project]
+name = "platform-tools"
+version = "0.1.0"
+description = "The pk command: architecture and contract checks for the platform foundation and its products."
+requires-python = ">=3.12"
+dependencies = ["pyyaml>=6.0", "jsonschema>=4.23", "import-linter>=2.1"]
+
+[project.scripts]
+pk = "platform_tools.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
