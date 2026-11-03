@@ -17,7 +17,14 @@ client = platform.http_client("catalogue", "https://catalogue.internal")
 client.request("GET", "/api/v1/skus")
 ```
 
-**Public routes:** `HttpSettings.public_prefixes` (or `create_app(public_prefixes=...)`) names path prefixes, such as `/hooks/`, whose routes authenticate callers themselves (a webhook signature, for example). Each prefix starts and ends with a slash, so `/hooks/` covers `/hooks/orders` but never `/hooks-admin` or `/hooks/` itself. Those routes run as an anonymous principal whose tenant scope matches no tenant; after authenticating the caller, a route sets the context it acts in. The deadline, body limit, correlation id, tracing, problem details and metrics still apply; idempotency does not.
+**Public routes:** `create_app(public_routers=...)` (or `Platform.create_app(public_routers=...)`) takes routers whose routes authenticate their callers themselves, such as a webhook receiver that checks a signature. A request skips token authentication only when the route the router will run is one of them: the middleware asks the app's routes in order, so a protected route that matches the path first keeps its authentication, and a mount or a root path cannot make another route public. Each public route starts with a fixed segment outside `/api`, `/health` and the docs, and a public router holds only its own API routes. A public route runs as `context.ANONYMOUS`, whose tenant scope matches no tenant and is never platform scope; once it has authenticated its caller, it acts as a partner in exactly one tenant:
+
+```python
+with context.as_partner(f"webhook:{name}", tenant):
+    ...  # the subject is "\u2205partner:webhook:<name>", kind "partner"
+```
+
+No token can name the anonymous caller or a partner: the middleware refuses a token whose principal has kind `anonymous` or `partner`, or a subject or tenant that starts with `\u2205`. The deadline, body limit, correlation id, tracing, problem details and metrics still apply; idempotency does not, because every anonymous caller would share one key space. An operation a partner starts belongs to that partner, so its `Location` is not readable by the sender; answer a webhook with what the sender needs instead.
 
 **Failure modes:** The kernel's own public paths match exactly. Idempotency keys are scoped to the caller and hash the method, path, query and body; replays return the stored status, body, ETag and Location. A 504 keeps the key reserved until its lease ends, because the outcome is unknown. Python cannot cancel threads, so when the deadline passes the middleware answers 504 itself and drops whatever the abandoned work sends; the work stops at its next kernel boundary (opening a unit of work, an outbound call, or the PostgreSQL statement timeout). Outbound calls connect to the address that passed the egress check (TLS verified against the host name), reject non-global addresses, bound the whole call by the budget, retry only idempotent requests, and use a breaker that lets one trial through when half-open.
 

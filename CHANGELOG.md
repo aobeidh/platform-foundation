@@ -1,15 +1,17 @@
 # Changelog
 
-## 0.5.0 (unreleased)
-
-### platform-kernel
-- Public routes for an app: `HttpSettings.public_prefixes` and `create_app(public_prefixes=...)` name path prefixes
-  (ending with a slash) whose routes authenticate callers themselves, such as webhook receivers. They run as an
-  anonymous principal with a scope that matches no tenant; the rest of the stack still applies, idempotency excepted.
-
 ## 0.4.0 (unreleased)
 
 ### platform-kernel
+- Public routes: `create_app(public_routers=...)` (and `Platform.create_app`) take routers whose routes authenticate
+  callers themselves, such as webhook receivers. A request is public only when the route the router runs is one of
+  them; a protected route that matches first keeps its authentication. A public route has a fixed first segment
+  outside `/api`, `/health` and the docs. It runs as `context.ANONYMOUS`, whose tenant scope matches no tenant, and
+  after authenticating its caller it acts as a partner in one tenant with `context.as_partner(name, tenant)`. The
+  rest of the stack still applies, idempotency excepted.
+- The anonymous principal's subject is now `\u2205anonymous` (it was `anonymous`), and a token whose principal is
+  reserved (kind `anonymous` or `partner`, or a subject or tenant starting with `\u2205`) is refused as
+  `TOKEN_INVALID`. The kernel's own public paths are matched without the app's root path.
 - Approval policy in the governed-record engine (ADR 0006): `auto`, `single` and `maker_checker`, with or without a
   required test, per kind through the `ApprovalPolicy` port (settings `APPROVAL`, `REQUIRE_TEST`, or
   `with_approval_policy`). Kinds may set a floor or a ceiling.
