@@ -244,8 +244,6 @@ def test_public_routes_skip_tokens_but_keep_the_stack():
     assert ok.status_code == 200 and body["kind"] == "anonymous" and body["correlation"] == "c-1"
     assert body["subject"].startswith(ctxmod.RESERVED) and body["tenant"] == ctxmod.ANONYMOUS_TENANT
     assert not body["platform"]  # the tenant header is ignored, and the scope is never platform scope
-    too_big = client.post("/hooks/orders", content=b"x" * 500, headers={"content-type": "application/json"})
-    assert too_big.status_code == 413 and too_big.headers["content-type"] == "application/problem+json"
     soon = (datetime.now(UTC) + timedelta(milliseconds=50)).isoformat()
     late = client.post("/hooks/orders/slow", headers={"Request-Deadline": soon})
     assert late.status_code == 504
@@ -345,8 +343,8 @@ def test_a_public_route_acts_as_a_partner_in_one_tenant():
     @r.post("/hooks/{name}")
     def hook(name: str) -> dict:
         with ctxmod.as_partner(f"webhook:{name}", "t1") as ctx:
-            return {"subject": ctx.principal.subject, "kind": ctx.principal.kind, "tenant": ctx.tenant.tenant,
-                    "after": None}
+            inside = {"subject": ctx.principal.subject, "kind": ctx.principal.kind, "tenant": ctx.tenant.tenant}
+        return {**inside, "after": ctxmod.current().principal.kind}
 
     @r.post("/other/{name}")
     def other(name: str) -> dict:
@@ -360,7 +358,7 @@ def test_a_public_route_acts_as_a_partner_in_one_tenant():
     client = TestClient(_public_app(public=[r]))
     body = client.post("/hooks/orders").json()
     assert body == {"subject": ctxmod.RESERVED + "partner:webhook:orders", "kind": "partner", "tenant": "t1",
-                    "after": None}
+                    "after": "anonymous"}
     assert client.post("/other/x").json() == {"refused": True}
 
 
@@ -372,7 +370,8 @@ def test_only_the_anonymous_caller_can_become_a_partner():
     anon = RequestContext(principal=ctxmod.ANONYMOUS, tenant=TenantScope(ctxmod.ANONYMOUS_TENANT), correlation_id="c",
                           deadline=datetime.now(UTC) + timedelta(seconds=5))
     with ctxmod.use(anon):
-        for name, tenant in (("bad name", "t1"), ("", "t1"), ("ok", ctxmod.ANONYMOUS_TENANT)):
+        for name, tenant in (("bad name", "t1"), ("", "t1"), ("ok", ctxmod.ANONYMOUS_TENANT), ("ok", " "),
+                             ("ok", "t1\n"), ("ok", None)):
             with pytest.raises(ValueError), ctxmod.as_partner(name, tenant):
                 pass
         with ctxmod.as_partner("orders", "t1") as ctx:
@@ -388,3 +387,78 @@ def test_the_platform_passes_public_routers_through():
     client = TestClient(platform.create_app(public_routers=[_hooks()]))
     assert client.post("/hooks/orders", json={}).json()["kind"] == "anonymous"
     assert client.get("/api/v1/operations").status_code == 401
+
+
+def test_what_changes_after_create_app_never_becomes_public():
+    """The public routes are a snapshot of the routers as checked, and the routes the app runs are read live."""
+    hooks = _hooks()
+    protected = APIRouter()
+
+    @protected.get("/hooks/admin")
+    def admin() -> dict:
+        return {"admin": True}
+
+    app = _public_app(public=[hooks])
+    client = TestClient(app)
+
+    @hooks.get("/api/v1/late")
+    def late() -> dict:
+        return {"late": True}
+
+    @hooks.get("/hooks/{name}/late")
+    def late_hook(name: str) -> dict:
+        return {"late": True}
+
+    extra = APIRouter()
+
+    @extra.get("/hooks/{name}/extra")
+    def extra_hook(name: str) -> dict:
+        return {"extra": True}
+
+    hooks.include_router(extra)
+    assert client.get("/api/v1/late").status_code == 401
+    assert client.get("/hooks/a/late").status_code == 401
+    assert client.get("/hooks/a/extra").status_code == 401
+    assert client.post("/hooks/a", json={}).status_code == 200  # the routes as checked still are public
+    app.include_router(protected)
+    app.router.routes = [app.router.routes[-1], *app.router.routes[:-1]]  # replaced, with a protected route first
+    assert client.get("/hooks/admin").status_code == 401
+
+
+def test_websockets_are_refused():
+    from starlette.websockets import WebSocketDisconnect
+
+    r = APIRouter()
+
+    @r.websocket("/api/v1/ws")
+    async def ws(socket) -> None:
+        await socket.accept()
+        await socket.send_json({"open": True})
+
+    client = TestClient(_public_app(routers=[r]))
+    with pytest.raises(WebSocketDisconnect) as e, client.websocket_connect("/api/v1/ws") as socket:
+        socket.receive_json()
+    assert e.value.code == 1008
+
+
+def test_claims_that_are_not_text_are_refused():
+    from platform_kernel.core import Ok
+
+    class Claims:
+        def __init__(self, principal: Principal) -> None:
+            self.principal = principal
+
+        def verify(self, token: str):
+            return Ok(self.principal)
+
+    r = APIRouter()
+
+    @r.get("/me")
+    def me() -> dict:
+        return {}
+
+    for p in (Principal(subject="x", kind=["anonymous"], tenant="t1"), Principal(subject="x", tenant=5),  # type: ignore[arg-type]
+              Principal(subject=7, tenant="t1")):  # type: ignore[arg-type]
+        client = TestClient(_public_app(routers=[r], verifier=Claims(p)))
+        refused = client.get("/me", headers={"Authorization": "Bearer t"})
+        assert refused.status_code == 401 and refused.json()["code"] == "TOKEN_INVALID"

@@ -26,6 +26,7 @@ class Principal:
 
 
 _PARTNER_NAME = re.compile(r"[A-Za-z0-9._:-]{1,100}")
+_TENANT = re.compile(r"[^\s\x00-\x1f\x7f]{1,200}")
 RESERVED = "\u2205"  # no token can carry a subject or tenant that starts with it: the middleware refuses one
 ANONYMOUS_TENANT = RESERVED + "anonymous"  # matches no real tenant
 # A caller on a public route, before the route has authenticated it.
@@ -34,7 +35,12 @@ PARTNER_KINDS = frozenset({"anonymous", "partner"})  # kinds only the kernel giv
 
 
 def reserved(principal: Principal) -> bool:
-    """True for a principal no token may claim: the anonymous caller and the partners public routes act as."""
+    """True for a principal no token may claim: the anonymous caller and the partners public routes act as, and
+    anything whose subject, kind or tenant is not text (a token's claims can hold any JSON)."""
+    if not isinstance(principal.subject, str) or not isinstance(principal.kind, str):
+        return True
+    if principal.tenant is not None and not isinstance(principal.tenant, str):
+        return True
     return (principal.kind in PARTNER_KINDS or principal.subject.startswith(RESERVED)
             or (principal.tenant or "").startswith(RESERVED))
 
@@ -130,8 +136,9 @@ def as_partner(name: str, tenant: str) -> Iterator[RequestContext]:
         raise PermissionError("Only a public route's anonymous caller can act as a partner.")
     if not _PARTNER_NAME.fullmatch(name or ""):
         raise ValueError(f"A partner name is 1 to 100 letters, digits, dots, colons, underscores or hyphens: {name!r}")
-    if not tenant or tenant.startswith(RESERVED):
-        raise ValueError("A partner acts in exactly one tenant.")
+    if not isinstance(tenant, str) or not _TENANT.fullmatch(tenant) or tenant.startswith(RESERVED):
+        raise ValueError("A partner acts in exactly one tenant, named without spaces or control characters: "
+                         f"{tenant!r}")
     partner = Principal(subject=f"{RESERVED}partner:{name}", kind="partner", tenant=tenant)
     with use(replace(ctx, principal=partner, tenant=TenantScope(tenant))) as inner:
         yield inner

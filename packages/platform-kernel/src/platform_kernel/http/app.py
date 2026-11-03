@@ -97,10 +97,11 @@ def _parse_deadline(value: str | None, default: timedelta, now: datetime) -> dat
 
 class PlatformMiddleware:
     def __init__(self, app: Any, *, settings: HttpSettings, verifier: TokenVerifier, catalog: ErrorCatalog,
-                 idempotency: IdempotencyStore | None, routes: list[Any] | None = None,
-                 public_routes: frozenset[int] = frozenset()) -> None:
+                 idempotency: IdempotencyStore | None, router: Any = None, public_routes: tuple[Any, ...] = ()) -> None:
         self.app, self.s, self.verifier, self.catalog, self.idem = app, settings, verifier, catalog, idempotency
-        self._routes, self._public = routes if routes is not None else [], public_routes
+        # The app's router, read on every request (its routes may be replaced), and the route objects that are public,
+        # held strongly so their identity can never pass to another route.
+        self._router, self._public = router, public_routes
 
     def _is_public(self, scope: dict) -> bool:
         """Public when the kernel's own public path is asked for exactly, or when the route the router will run is one
@@ -108,12 +109,12 @@ class PlatformMiddleware:
         path first keeps its authentication, and a mount or a root path cannot make another route public."""
         if is_public(route_path(scope)):
             return True
-        if not self._public:
+        if not self._public or self._router is None:
             return False
-        for route in self._routes:
+        for route in self._router.routes:
             match, _ = route.matches(scope)
             if match is Match.FULL:
-                return id(route) in self._public
+                return any(route is p for p in self._public)
         return False
 
     async def _send_problem(self, send: Any, error: DomainError, correlation_id: str,
@@ -132,6 +133,10 @@ class PlatformMiddleware:
         await send({"type": "http.response.body", "body": raw})
 
     async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        if scope["type"] == "websocket":
+            # The stack authenticates HTTP requests only; a websocket would reach its handler with no principal.
+            await send({"type": "websocket.close", "code": 1008, "reason": "This service does not serve websockets."})
+            return
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -414,18 +419,21 @@ def create_app(*, settings: HttpSettings, verifier: TokenVerifier, catalog: Erro
 
     for r in routers:
         app.include_router(r)
-    public: set[int] = set()
+    public: list[Any] = []
     for r in public_routers:
-        for route in r.routes:
+        # A snapshot of the routes as checked: what is added to the router later never becomes public.
+        snapshot = APIRouter()
+        for route in list(r.routes):
             if not isinstance(route, APIRoute):
                 raise ValueError("A public router holds only its own API routes, not other routers, mounts or "
                                  "websockets.")
             _check_public(route.path)
+            snapshot.routes.append(route)
         before = len(app.router.routes)
-        app.include_router(r)
-        # What the include added to the app's routes (the router itself, or copies of its routes): the middleware
-        # treats a request as public only when one of these is the first full match.
-        public.update(id(route) for route in app.router.routes[before:])
+        app.include_router(snapshot)
+        # What the include added to the app's routes (the snapshot, or copies of its routes): the middleware treats a
+        # request as public only when one of these is the first full match.
+        public += app.router.routes[before:]
     app.add_middleware(PlatformMiddleware, settings=settings, verifier=verifier, catalog=catalog,
-                       idempotency=idempotency, routes=app.router.routes, public_routes=frozenset(public))
+                       idempotency=idempotency, router=app.router, public_routes=tuple(public))
     return app
