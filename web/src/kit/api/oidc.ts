@@ -194,6 +194,7 @@ export class OidcTokenSource implements TokenSource {
   }
 
   private async exchange(form: Record<string, string>, nonce?: string) {
+    if (this.ended) throw new SignInError('The session has ended.');
     let res: Response;
     try {
       res = await this.env.fetch(this.endpoints.token_endpoint, {
@@ -205,6 +206,7 @@ export class OidcTokenSource implements TokenSource {
     }
     if (res.status >= 500) throw new Unreachable(`The identity provider answered ${res.status}.`);
     const body = await res.json().catch(() => ({})) as TokenAnswer & { error?: string; error_description?: string };
+    if (this.ended) throw new SignInError('The session has ended.');  // signed out while this was under way
     if (!res.ok || !body.access_token) throw new SignInError(body.error_description || body.error || `The identity provider answered ${res.status}.`);
     if (body.id_token) {
       const c = claimsOf(body.id_token);

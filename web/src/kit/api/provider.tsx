@@ -50,7 +50,11 @@ export function ApiProvider({ transport, identities = [], initialIdentity, token
   const [none] = useState<TokenSource>(() => ({ token: () => null }));
   const tokens: TokenSource = signedIn ?? demo ?? none;
   const [ended, setEnded] = useState(() => !!signedIn?.ended);
-  useEffect(() => signedIn?.subscribe?.(() => setEnded(!!signedIn.ended)), [signedIn]);
+  useEffect(() => {
+    const off = signedIn?.subscribe?.(() => setEnded(!!signedIn.ended));
+    setEnded(!!signedIn?.ended);  // an end between the first render and the subscription is not missed
+    return off;
+  }, [signedIn]);
   const api = useMemo(() => new ApiClient(transport, tokens), [transport, tokens]);
 
   const value = useMemo<ApiContextValue>(() => ({

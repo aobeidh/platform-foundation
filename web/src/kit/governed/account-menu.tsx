@@ -12,7 +12,7 @@ const initials = (n: string) => n.split(/[\s.@_-]+/).filter(Boolean).map((p) => 
 /** The person signed in through the identity provider: who they are, their scope and roles, and signing out. */
 export function AccountMenu() {
   const { t } = useTranslation();
-  const { account, signOut } = useApi();
+  const { account, signOut, sessionEnded, signIn } = useApi();
   const me = useMe();
   const [open, setOpen] = useState(false);
   if (!account) return null;  // demo identities: see IdentitySwitcher
@@ -40,6 +40,12 @@ export function AccountMenu() {
             <p className="text-12 text-dim">{t('account.roles')}: <span dir="ltr" className="font-mono">{me.data.roles.join(', ')}</span></p>
           )}
         </div>
+        {sessionEnded && signIn && (
+          <div className="mt-3 flex flex-col gap-2 border-t border-line pt-3">
+            <p className="text-12 text-warn">{t('account.ended')}</p>
+            <Button size="sm" className="w-full" onClick={signIn}>{t('account.retry')}</Button>
+          </div>
+        )}
         {signOut && (
           <div className="mt-3 border-t border-line pt-3">
             <Button variant="secondary" size="sm" className="w-full" onClick={signOut}><LogOut />{t('account.signOut')}</Button>

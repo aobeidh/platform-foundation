@@ -27,8 +27,10 @@ export class ApiClient {
     // are not renewed: a new token would be refused the same way.
     if (res.status === 401) {
       const code = (res.body as { code?: string } | null)?.code;
-      if (this.tokens.token() !== sentWith && this.tokens.token()) res = await send();
-      else if (code === 'TOKEN_EXPIRED' && this.tokens.refresh && (await this.tokens.refresh())) res = await send();
+      if (code === 'TOKEN_EXPIRED') {
+        if (this.tokens.token() !== sentWith && this.tokens.token()) res = await send();
+        else if (this.tokens.refresh && (await this.tokens.refresh())) res = await send();
+      }
     }
     if (res.status < 200 || res.status >= 300) throw new ApiError(asProblem(res.status, res.body));
     return { data: res.body as T, etag: res.headers.etag, location: res.headers.location, status: res.status };
