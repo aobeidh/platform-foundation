@@ -36,7 +36,8 @@ _duration = meter.create_histogram("http.server.duration", unit="ms", descriptio
 
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
 PUBLIC_PATHS = frozenset({"/health/live", "/health/ready", "/openapi.json", "/docs", "/docs/oauth2-redirect",
-                          "/redoc"})
+                          "/redoc",
+                          "/api/v1/portal/sign-in"})  # how a portal signs people in: asked before anyone is signed in
 REPLAY_HEADERS = ("etag", "location", "content-type")
 
 

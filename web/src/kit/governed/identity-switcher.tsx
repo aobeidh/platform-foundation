@@ -13,6 +13,7 @@ export function IdentitySwitcher() {
   const { t } = useTranslation();
   const { identity, identities, setIdentity } = useApi();
   const [open, setOpen] = useState(false);
+  if (!identity) return null;  // people sign in through an identity provider: see AccountMenu
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>

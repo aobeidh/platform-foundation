@@ -171,7 +171,7 @@
       "name": "api-kit",
       "type": "registry:ui",
       "title": "api-kit",
-      "description": "@platform/web-kit api-kit (kit/api/client.ts, kit/api/hooks.ts, kit/api/http-transport.ts, kit/api/identity.ts, kit/api/index.ts, kit/api/provider.tsx, kit/api/transport.ts, kit/api/types.ts, kit/api/simulated/server.ts)",
+      "description": "@platform/web-kit api-kit (kit/api/client.ts, kit/api/hooks.ts, kit/api/http-transport.ts, kit/api/identity.ts, kit/api/index.ts, kit/api/oidc.ts, kit/api/provider.tsx, kit/api/session.ts, kit/api/transport.ts, kit/api/types.ts, kit/api/simulated/server.ts)",
       "dependencies": [
         "@tanstack/react-query@5.105.1",
         "ajv@8.20.0",
@@ -207,9 +207,19 @@
           "target": "src/kit/api/index.ts"
         },
         {
+          "path": "src/kit/api/oidc.ts",
+          "type": "registry:file",
+          "target": "src/kit/api/oidc.ts"
+        },
+        {
           "path": "src/kit/api/provider.tsx",
           "type": "registry:file",
           "target": "src/kit/api/provider.tsx"
+        },
+        {
+          "path": "src/kit/api/session.ts",
+          "type": "registry:file",
+          "target": "src/kit/api/session.ts"
         },
         {
           "path": "src/kit/api/transport.ts",
@@ -232,7 +242,7 @@
       "name": "governed-kit",
       "type": "registry:ui",
       "title": "governed-kit",
-      "description": "@platform/web-kit governed-kit (kit/governed/governed-actions.tsx, kit/governed/identity-switcher.tsx, kit/governed/index.ts, kit/governed/lifecycle-gates.tsx, kit/governed/operation-progress.tsx, kit/governed/problem.tsx, kit/governed/schema-fields.tsx, kit/governed/schema.ts)",
+      "description": "@platform/web-kit governed-kit (kit/governed/account-menu.tsx, kit/governed/governed-actions.tsx, kit/governed/identity-switcher.tsx, kit/governed/index.ts, kit/governed/lifecycle-gates.tsx, kit/governed/operation-progress.tsx, kit/governed/problem.tsx, kit/governed/schema-fields.tsx, kit/governed/schema.ts)",
       "dependencies": [
         "lucide-react@1.66.0",
         "react-hook-form@7.91.0",
@@ -260,6 +270,11 @@
         "@platform/utils"
       ],
       "files": [
+        {
+          "path": "src/kit/governed/account-menu.tsx",
+          "type": "registry:file",
+          "target": "src/kit/governed/account-menu.tsx"
+        },
         {
           "path": "src/kit/governed/governed-actions.tsx",
           "type": "registry:file",

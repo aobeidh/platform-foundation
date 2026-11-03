@@ -114,6 +114,7 @@ export class SimulatedTransport implements Transport {
     const correlationId = simId();
     try {
       if (path === '/health/live') return { status: 200, headers: {}, body: { status: 'live' } };
+      if (path === '/api/v1/portal/sign-in') return { status: 200, headers: {}, body: { method: 'demo' } };  // public, as in the kernel
       const caller = this.caller(req.headers?.Authorization ?? req.headers?.authorization);
       const out = this.route(req.method, path, req, caller);
       this.save();

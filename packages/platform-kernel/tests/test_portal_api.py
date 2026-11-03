@@ -115,3 +115,54 @@ def test_r6_kinds_and_plugin_schemas_follow_capabilities():
     assert c.get("/api/v1/portal/kinds", headers=stranger).json()["items"] == []
     assert c.get("/api/v1/portal/plugins", headers=stranger).status_code == 403
     p.close()
+
+
+def test_sign_in_says_demo_and_needs_no_token():
+    p, c = _app()
+    r = c.get("/api/v1/portal/sign-in")
+    assert r.status_code == 200 and r.json() == {"method": "demo"}
+    p.close()
+
+
+def _oidc_platform(**kw):
+    settings = PlatformSettings(service="notes", egress_allowlist=("idp.example.com",), **kw.pop("settings", {}))
+    return (Platform.builder("notes", settings)
+            .with_oidc(issuer="https://idp.example.com/realms/notes", audience="notes",
+                       jwks_url="https://idp.example.com/realms/notes/protocol/openid-connect/certs", **kw)
+            .build())
+
+
+def test_sign_in_gives_the_oidc_settings_of_the_portal_client():
+    p = _oidc_platform(portal_client_id="notes-portal", portal_scopes=("profile", "openid", "email"))
+    c = TestClient(p.create_app())
+    assert c.get("/api/v1/portal/sign-in").json() == {
+        "method": "oidc", "issuer": "https://idp.example.com/realms/notes", "clientId": "notes-portal",
+        "scopes": ["openid", "profile", "email"]}
+    assert c.get("/api/v1/portal/me").status_code == 401  # the rest of the portal API still needs a token
+    p.close()
+
+
+def test_sign_in_without_a_portal_client_is_none():
+    p = _oidc_platform()
+    assert TestClient(p.create_app()).get("/api/v1/portal/sign-in").json() == {"method": "none"}
+    p.close()
+
+
+def test_sign_in_is_public_only_at_its_exact_path():
+    p, c = _app()
+    assert c.get("/api/v1/portal/sign-in/x").status_code in (401, 404)
+    assert c.get("/api/v1/portal/sign-inx").status_code in (401, 404)
+    p.close()
+
+
+def test_a_portal_client_needs_an_https_issuer_in_production():
+    import pytest
+    from platform_kernel.platform import ConfigurationError
+
+    with pytest.raises(ConfigurationError) as e:
+        settings = PlatformSettings(service="notes", environment="production", egress_allowlist=("idp",))
+        (Platform.builder("notes", settings)
+         .with_oidc(issuer="http://idp/realms/notes", audience="notes", jwks_url="https://idp/certs",
+                    portal_client_id="p")
+         .build())
+    assert any("https" in p for p in e.value.problems)

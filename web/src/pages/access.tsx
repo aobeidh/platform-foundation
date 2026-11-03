@@ -43,7 +43,7 @@ export function AccessPage() {
             <CardHeader><CardTitle>{t('acc.people')}</CardTitle><CardDescription>{t('shell.identityHint')}</CardDescription></CardHeader>
             <CardContent className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               {identities.map((i) => (
-                <button key={i.id} type="button" onClick={() => setIdentity(i.id)} aria-pressed={i.id === identity.id}
+                <button key={i.id} type="button" onClick={() => setIdentity(i.id)} aria-pressed={i.id === identity?.id}
                   className="rounded-[10px] border border-line bg-panel p-3 text-start transition hover:border-line2 aria-pressed:border-accent aria-pressed:bg-wash">
                   <div className="text-13 font-medium text-fg">{i.displayName}</div>
                   <div className="text-12 text-muted">{t(i.roleKey)}</div>

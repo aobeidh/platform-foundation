@@ -152,3 +152,20 @@ def test_built_platform_serves_governed_api_with_capabilities():
     assert client.post(f"/api/v1/notes/{rid}/pause", headers=author).json()["code"] == "VALIDATION_FAILED"
     assert p.relay.run_once() == 4
     assert set(p.simulated) == {"identity", "persistence", "secrets"}
+
+
+def test_egress_exceptions_come_from_settings_and_plain_http_is_refused_in_production():
+    import pytest
+    from platform_kernel.config import PlatformSettings
+    from platform_kernel.platform import ConfigurationError, Platform
+
+    s = PlatformSettings.from_env("svc", {"ALLOW_DEMO": "true", "EGRESS_ALLOWLIST": "idp",
+                                          "EGRESS_ALLOW_PRIVATE": "idp", "EGRESS_ALLOW_PLAIN_HTTP": "idp"})
+    assert s.egress_allow_private == ("idp",) and s.egress_allow_plain_http == ("idp",)
+    p = Platform.builder("svc", s).build()
+    assert p.egress.allow_private == ("idp",) and p.egress.allow_plain_http == ("idp",)
+    p.close()
+    prod = PlatformSettings.from_env("svc", {"ENVIRONMENT": "production", "EGRESS_ALLOW_PLAIN_HTTP": "idp"})
+    with pytest.raises(ConfigurationError) as e:
+        Platform.builder("svc", prod).build()
+    assert "EGRESS_ALLOW_PLAIN_HTTP" in str(e.value)
