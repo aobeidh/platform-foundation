@@ -10,7 +10,10 @@ export const keys = {
   operations: ['operations'] as const, operation: (id: string) => ['operations', id] as const, activations: ['activations'] as const,
 };
 
-export function useMe() { const { api, identity } = useApi(); return useQuery({ queryKey: [...keys.me, identity.id], queryFn: api.me }); }
+export function useMe() {
+  const { api, identity, account } = useApi();
+  return useQuery({ queryKey: [...keys.me, identity?.id ?? account?.subject ?? ''], queryFn: api.me });
+}
 export function useKinds() { const { api } = useApi(); return useQuery({ queryKey: keys.kinds, queryFn: api.kinds, staleTime: 60_000 }); }
 export function usePlugins() { const { api } = useApi(); return useQuery({ queryKey: keys.plugins, queryFn: api.plugins, staleTime: 60_000 }); }
 

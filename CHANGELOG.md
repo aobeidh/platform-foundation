@@ -2,6 +2,16 @@
 
 ## 0.4.0 (unreleased)
 
+### Portal sign-in (ADR 0007)
+- `GET /api/v1/portal/sign-in` is public and says how a portal signs people in: OIDC settings when
+  `with_oidc(..., portal_client_id=..., portal_scopes=...)` names a public client, `demo` with demo tokens, or `none`.
+- `EGRESS_ALLOW_PRIVATE` and `EGRESS_ALLOW_PLAIN_HTTP` fill the egress policy's exceptions, for an identity provider
+  inside the cluster. Plain HTTP is refused when `ENVIRONMENT=production`.
+- web-kit: `OidcTokenSource` (Authorization Code with PKCE, tokens in memory, renewal with the refresh token, sign-out
+  through the provider), `startSession(transport)`, `ApiProvider` with `tokens` and `account`, `AccountMenu` and
+  `SignInProblem`. `TokenSource.refresh` is optional; `ApiClient` renews once after a 401 and sends again.
+  `useApi().identity` is `null` when people sign in through a provider.
+
 ### platform-kernel
 - Public routes: `create_app(public_routers=...)` (and `Platform.create_app`) take routers whose routes authenticate
   callers themselves, such as webhook receivers. A request is public only when the route the router runs is one of

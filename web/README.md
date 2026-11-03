@@ -85,6 +85,8 @@ shadcn-ui repository (`apps/v4/registry/new-york-v4`) and restyled.
 
 ## Known limits
 
-- Demo identities only; OIDC sign-in in the browser comes with the next identity provider for `TokenSource`.
+- Sign-in: `startSession(transport)` asks the service (`GET /api/v1/portal/sign-in`) and returns demo identities or an
+  `OidcTokenSource` (Authorization Code with PKCE, tokens in memory). Pass it to `ApiProvider` as `tokens` with its
+  `account`, and show `AccountMenu` beside `IdentitySwitcher`; see `src/main.tsx` and ADR 0007.
 - No audit view yet: the kernel has no audit read API.
 - The single-file page is about 2 MB because fonts are inlined.

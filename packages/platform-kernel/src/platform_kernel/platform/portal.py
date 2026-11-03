@@ -41,6 +41,12 @@ def _signed_in() -> None:
 def portal_router(platform: Platform, prefix: str = "/api/v1") -> APIRouter:
     r = APIRouter(prefix=f"{prefix}/portal", tags=["portal"])
 
+    @r.get("/sign-in", summary="How the portal signs people in: OIDC settings, demo identities, or none")
+    def sign_in() -> dict[str, Any]:
+        # Public (http.app.PUBLIC_PATHS): a portal asks before anyone is signed in. It holds nothing secret: the
+        # client is a public one, and the issuer publishes the rest.
+        return dict(platform.sign_in)
+
     @r.get("/me", summary="The caller, their tenant and the capabilities the portal may offer them")
     def me() -> dict[str, Any]:
         _signed_in()

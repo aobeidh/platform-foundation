@@ -1165,6 +1165,29 @@
           "portal"
         ]
       }
+    },
+    "/api/v1/portal/sign-in": {
+      "get": {
+        "operationId": "sign_in_api_v1_portal_sign_in_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sign In Api V1 Portal Sign In Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "How the portal signs people in: OIDC settings, demo identities, or none",
+        "tags": [
+          "portal"
+        ]
+      }
     }
   }
 }

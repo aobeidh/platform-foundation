@@ -1,7 +1,14 @@
 // The token source port. Demo identities are a simulated provider (labelled in the UI, refused in production by
-// the kernel); an OIDC provider would return the signed-in user's access token instead.
+// the kernel); OidcTokenSource (./oidc) returns the signed-in person's access token instead.
 
-export interface TokenSource { token(): string | null }
+export interface TokenSource {
+  token(): string | null;
+  /** Renews the token after the service refused it as unauthenticated; false when it cannot. Optional. */
+  refresh?(): Promise<boolean>;
+}
+
+/** The person signed in through an identity provider, as the portal shows them. */
+export interface Account { subject: string; name: string; email?: string }
 
 export interface DemoIdentity { id: string; subject: string; displayName: string; roles: string[]; tenant: string | null; roleKey: string }
 

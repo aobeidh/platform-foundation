@@ -82,6 +82,9 @@ class Platform:
     operations: OperationRunner
     simulated: list[str]
     tokens: OAuthTokenService | None = None
+    # How a portal signs people in (GET /api/v1/portal/sign-in): {"method": "oidc", "issuer", "clientId", "scopes"},
+    # {"method": "demo"}, or {"method": "none"} when tokens come from elsewhere (a host application, for example).
+    sign_in: dict[str, Any] = field(default_factory=lambda: {"method": "none"})
     capabilities: CapabilityCatalog = field(default_factory=CapabilityCatalog)
     _plugin_hosts: dict[str, PluginHost] = field(default_factory=dict)
     _migrations: list[Path] = field(default_factory=list)
@@ -238,6 +241,15 @@ class PlatformBuilder:
         self._secrets = store
         return self
 
+    def _sign_in(self, verifier: Any) -> dict[str, Any]:
+        o = self._oidc
+        if o is not None and o["portal_client_id"] and isinstance(verifier, OidcTokenVerifier):
+            scopes = ["openid", *(x for x in o["portal_scopes"] if x != "openid")]
+            return {"method": "oidc", "issuer": o["issuer"], "clientId": o["portal_client_id"], "scopes": scopes}
+        if getattr(verifier, "simulated", False):
+            return {"method": "demo"}
+        return {"method": "none"}
+
     def with_egress(self, policy: EgressPolicy) -> PlatformBuilder:
         self._egress = policy
         return self
@@ -264,11 +276,15 @@ class PlatformBuilder:
 
     def with_oidc(self, *, issuer: str, audience: str, jwks_url: str, algorithms: tuple[str, ...] = ("RS256",),
                   roles_claim: str = "roles", tenant_claim: str = "tenant",
-                  platform_roles: frozenset[str] = frozenset()) -> PlatformBuilder:
+                  platform_roles: frozenset[str] = frozenset(), portal_client_id: str | None = None,
+                  portal_scopes: tuple[str, ...] = ()) -> PlatformBuilder:
         """Verify bearer tokens from an OIDC provider; keys come from its JWKS endpoint through the egress policy.
-        Tokens without a tenant claim are refused unless they carry one of `platform_roles` (staff)."""
+        Tokens without a tenant claim are refused unless they carry one of `platform_roles` (staff).
+        `portal_client_id` is the provider's public client for the service's portal: the portal signs people in with
+        it (Authorization Code with PKCE) and asks for `openid` plus `portal_scopes`."""
         self._oidc = {"issuer": issuer, "audience": audience, "jwks_url": jwks_url, "algorithms": algorithms,
-                      "roles_claim": roles_claim, "tenant_claim": tenant_claim, "platform_roles": platform_roles}
+                      "roles_claim": roles_claim, "tenant_claim": tenant_claim, "platform_roles": platform_roles,
+                      "portal_client_id": portal_client_id, "portal_scopes": tuple(portal_scopes)}
         return self
 
     def with_oauth(self, *, token_url: str, client_id: str, client_secret_ref: str) -> PlatformBuilder:
@@ -332,7 +348,10 @@ class PlatformBuilder:
             uow_factory, outbox, idem, store = MemoryUnitOfWorkFactory(), None, None, None  # type: ignore[assignment]
             op_store = None
 
-        egress = self._egress or EgressPolicy(allowlist=s.egress_allowlist)
+        egress = self._egress or EgressPolicy(allowlist=s.egress_allowlist, allow_private=s.egress_allow_private,
+                                              allow_plain_http=s.egress_allow_plain_http)
+        if s.production and egress.allow_plain_http:
+            problems.append("EGRESS_ALLOW_PLAIN_HTTP is not allowed when ENVIRONMENT=production")
         if self._oidc is not None and self._verifier is None:
             from urllib.parse import urlsplit
 
@@ -428,6 +447,7 @@ class PlatformBuilder:
             egress=egress, governance=governance,
             consumers=consumers, relay=relay, expressions=expressions, operations=operations,
             simulated=sorted(set(simulated)), tokens=tokens, capabilities=self._capabilities,
+            sign_in=self._sign_in(verifier),
             _migrations=list(self._migrations), _engine=engine)
         for pk in self._plugin_kinds:
             host = PluginHost(pk.kind, pk.spi_version, pk.spi, signature)

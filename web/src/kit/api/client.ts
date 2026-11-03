@@ -11,12 +11,18 @@ export class ApiClient {
   constructor(public readonly transport: Transport, private readonly tokens: TokenSource) {}
 
   async call<T>(method: Method, path: string, opts: { body?: unknown; ifMatch?: number; idempotencyKey?: string } = {}): Promise<Sent<T>> {
-    const headers: Record<string, string> = {};
-    const token = this.tokens.token();
-    if (token) headers.Authorization = `Bearer ${token}`;
-    if (opts.ifMatch !== undefined) headers['If-Match'] = `"${opts.ifMatch}"`;
-    if (opts.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey;
-    const res = await this.transport.send({ method, path, body: opts.body, headers });
+    const send = () => {
+      const headers: Record<string, string> = {};
+      const token = this.tokens.token();
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (opts.ifMatch !== undefined) headers['If-Match'] = `"${opts.ifMatch}"`;
+      if (opts.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey;
+      return this.transport.send({ method, path, body: opts.body, headers });
+    };
+    let res = await send();
+    // A token that expired between renewals: renew it once and send again (the same idempotency key, so a write
+    // the service did apply is not applied twice).
+    if (res.status === 401 && this.tokens.refresh && (await this.tokens.refresh())) res = await send();
     if (res.status < 200 || res.status >= 300) throw new ApiError(asProblem(res.status, res.body));
     return { data: res.body as T, etag: res.headers.etag, location: res.headers.location, status: res.status };
   }

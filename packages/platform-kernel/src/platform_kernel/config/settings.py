@@ -35,6 +35,10 @@ class PlatformSettings(BaseModel):
     idempotency_retention_hours: int = 24
     allow_demo: bool = False
     egress_allowlist: tuple[str, ...] = ()
+    # Allowed hosts that may resolve to private addresses (internal services), and those reached without TLS (refused
+    # in production).
+    egress_allow_private: tuple[str, ...] = ()
+    egress_allow_plain_http: tuple[str, ...] = ()
     expression_language: str = "jsonata"
     approval: Literal["auto", "single", "maker_checker"] = "maker_checker"  # default rule for governed kinds (P14)
     require_test: bool = True
@@ -60,8 +64,10 @@ class PlatformSettings(BaseModel):
             values["allow_demo"] = True
         if "REQUIRE_TEST" in env:
             values["require_test"] = env["REQUIRE_TEST"].lower() in {"1", "true", "yes"}
-        if env.get("EGRESS_ALLOWLIST"):
-            values["egress_allowlist"] = tuple(h.strip() for h in env["EGRESS_ALLOWLIST"].split(",") if h.strip())
+        for key, name in (("EGRESS_ALLOWLIST", "egress_allowlist"), ("EGRESS_ALLOW_PRIVATE", "egress_allow_private"),
+                          ("EGRESS_ALLOW_PLAIN_HTTP", "egress_allow_plain_http")):
+            if env.get(key):
+                values[name] = tuple(h.strip() for h in env[key].split(",") if h.strip())
         values["providers"] = {k[len("PROVIDER_"):].lower(): v for k, v in env.items() if k.startswith("PROVIDER_")}
         values.update(overrides)
         return cls(**values)

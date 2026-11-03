@@ -2,6 +2,8 @@ export * from './types';
 export * from './transport';
 export * from './client';
 export * from './identity';
+export * from './oidc';
+export * from './session';
 export * from './http-transport';
 export * from './provider';
 export * from './hooks';
