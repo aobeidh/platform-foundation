@@ -6,9 +6,10 @@ import type { Account, TokenSource } from './identity';
 // Tokens live in memory only. Browser storage holds just the one-time values of a sign-in under way (state, nonce,
 // code verifier and the page to return to), and they are removed when the provider sends the person back. A reload
 // therefore signs in again: the provider's own session usually answers at once, without asking. The ID token's
-// nonce, issuer and audience are checked; it came straight from the token endpoint over TLS, so its signature is not
-// (OpenID Connect Core 3.1.3.7). The access token is renewed with the refresh token before it expires; when that is
-// not possible, the person goes through sign-in again and comes back to the page they were on.
+// issuer, audience, authorized party, expiry and nonce are checked; it came straight from the token endpoint over
+// TLS, so its signature is not (OpenID Connect Core 3.1.3.7). The access token is renewed with the refresh token
+// before it expires. When it cannot be renewed the session has ended: the source never leaves the page by itself,
+// so nothing unsaved is lost, and the portal asks the person to sign in again (SessionEnded).
 
 export interface OidcSettings { issuer: string; clientId: string; scopes: string[] }
 
@@ -40,8 +41,22 @@ export const browserEnv = (): OidcEnv => ({
 /** A sign-in that did not complete: the provider refused it, or its answer could not be trusted. */
 export class SignInError extends Error {}
 
+/** The identity provider could not be reached: trying again later may work. */
+class Unreachable extends SignInError {}
+
 const PENDING = 'pf-oidc-pending';
 const EARLY_MS = 60_000;  // renew this long before the access token expires
+const RETRY_MS = 30_000;  // after the provider could not be reached
+const LEEWAY_S = 60;  // clock difference allowed for the ID token's expiry
+// What the provider adds to the address when it sends the person back: never kept in the address bar or history.
+const ANSWER = ['code', 'state', 'error', 'error_description', 'error_uri', 'iss', 'session_state'];
+
+/** The address without what a provider's answer adds to it. */
+export function withoutAnswer(href: string) {
+  const u = new URL(href);
+  for (const k of ANSWER) u.searchParams.delete(k);
+  return `${u.pathname}${u.search}${u.hash}`;
+}
 
 export const base64url = (bytes: Uint8Array) =>
   btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -57,7 +72,6 @@ function claimsOf(jwt: string): Record<string, unknown> {
   return JSON.parse(decodeURIComponent(Array.from(text, (c) => `%${c.charCodeAt(0).toString(16).padStart(2, '0')}`).join(''))) as Record<string, unknown>;
 }
 
-const trim = (url: string) => url.replace(/\/+$/, '');
 
 interface Endpoints { issuer: string; authorization_endpoint: string; token_endpoint: string; end_session_endpoint?: string }
 interface Pending { state: string; nonce: string; verifier: string; returnTo: string }
@@ -69,6 +83,9 @@ export class OidcTokenSource implements TokenSource {
   private idToken: string | null = null;
   private timer: unknown = null;
   private renewing: Promise<boolean> | null = null;
+  private expiresAt = 0;
+  private readonly listeners = new Set<() => void>();
+  ended = false;
   account: Account | null = null;
 
   private constructor(private readonly settings: OidcSettings, private readonly endpoints: Endpoints, private readonly env: OidcEnv) {}
@@ -82,10 +99,13 @@ export class OidcTokenSource implements TokenSource {
     const source = new OidcTokenSource(settings, endpoints, env);
     const url = new URL(env.location.href);
     const raw = env.storage.getItem(PENDING);
-    if (raw && (url.searchParams.has('code') || url.searchParams.has('error'))) {
+    const answered = url.searchParams.has('code') || url.searchParams.has('error');
+    // The code is single use, but never left in the address bar or history either, whatever happens next.
+    if (answered) env.replaceUrl(withoutAnswer(env.location.href));
+    if (raw && answered) {
       env.storage.removeItem(PENDING);
       const pending = JSON.parse(raw) as Pending;
-      env.replaceUrl(pending.returnTo);  // the code is single use: never leave it in the address bar or history
+      env.replaceUrl(pending.returnTo);
       if (url.searchParams.get('state') !== pending.state) throw new SignInError('The sign-in answer does not belong to this sign-in.');
       const error = url.searchParams.get('error');
       if (error) throw new SignInError(url.searchParams.get('error_description') || error);
@@ -100,7 +120,9 @@ export class OidcTokenSource implements TokenSource {
 
   token() { return this.access; }
 
-  /** Renews the access token with the refresh token; without one, or when renewal fails, signs in again. */
+  subscribe(fn: () => void) { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; }
+
+  /** Renews the access token with the refresh token. False when it cannot now; `ended` says whether it never will. */
   refresh(): Promise<boolean> {
     if (!this.renewing) {
       this.renewing = this.renew().finally(() => { this.renewing = null; });
@@ -113,7 +135,7 @@ export class OidcTokenSource implements TokenSource {
     const verifier = base64url(this.env.random(32));
     const pending: Pending = {
       state: base64url(this.env.random(16)), nonce: base64url(this.env.random(16)), verifier,
-      returnTo: `${this.env.location.pathname}${this.env.location.search}${this.env.location.hash}`,
+      returnTo: withoutAnswer(this.env.location.href),
     };
     this.env.storage.setItem(PENDING, JSON.stringify(pending));
     const q = new URLSearchParams({
@@ -127,6 +149,7 @@ export class OidcTokenSource implements TokenSource {
 
   /** Forgets the tokens and ends the provider's session, when it offers that; otherwise signs in again. */
   signOut() {
+    this.ended = true;
     const hint = this.idToken;
     this.forget();
     if (this.endpoints.end_session_endpoint) {
@@ -146,14 +169,28 @@ export class OidcTokenSource implements TokenSource {
   }
 
   private async renew(): Promise<boolean> {
-    if (this.refreshToken) {
-      try {
-        await this.exchange({ grant_type: 'refresh_token', refresh_token: this.refreshToken, client_id: this.settings.clientId });
-        return true;
-      } catch { /* the provider's session ended: sign in again */ }
+    if (!this.refreshToken || this.ended) { this.end(); return false; }
+    try {
+      await this.exchange({ grant_type: 'refresh_token', refresh_token: this.refreshToken, client_id: this.settings.clientId });
+      return true;
+    } catch (e) {
+      if (e instanceof Unreachable && this.env.now() < this.expiresAt) this.schedule(RETRY_MS);  // try again while it lasts
+      else this.end();
+      return false;
     }
-    this.forget();
-    return this.signIn();
+  }
+
+  /** The session cannot be renewed: the access token works until it expires, and the portal asks to sign in again. */
+  private end() {
+    if (this.timer !== null) this.env.cancel(this.timer);
+    this.timer = null;
+    this.refreshToken = null;
+    if (!this.ended) { this.ended = true; this.listeners.forEach((l) => l()); }
+  }
+
+  private schedule(ms: number) {
+    if (this.timer !== null) this.env.cancel(this.timer);
+    this.timer = this.env.later(() => { this.timer = null; void this.refresh(); }, Math.max(5_000, ms));
   }
 
   private async exchange(form: Record<string, string>, nonce?: string) {
@@ -164,16 +201,20 @@ export class OidcTokenSource implements TokenSource {
         body: new URLSearchParams(form).toString(),
       });
     } catch {
-      throw new SignInError('The identity provider could not be reached.');
+      throw new Unreachable('The identity provider could not be reached.');
     }
+    if (res.status >= 500) throw new Unreachable(`The identity provider answered ${res.status}.`);
     const body = await res.json().catch(() => ({})) as TokenAnswer & { error?: string; error_description?: string };
     if (!res.ok || !body.access_token) throw new SignInError(body.error_description || body.error || `The identity provider answered ${res.status}.`);
     if (body.id_token) {
       const c = claimsOf(body.id_token);
       const aud = Array.isArray(c.aud) ? c.aud : [c.aud];
-      if (trim(String(c.iss)) !== trim(this.settings.issuer)) throw new SignInError('The ID token comes from another issuer.');
+      if (c.iss !== this.settings.issuer) throw new SignInError('The ID token comes from another issuer.');
       if (!aud.includes(this.settings.clientId)) throw new SignInError('The ID token is not for this portal.');
+      if (aud.length > 1 && c.azp !== this.settings.clientId) throw new SignInError('The ID token was issued to another client.');
+      if (typeof c.exp !== 'number' || c.exp + LEEWAY_S < this.env.now() / 1000) throw new SignInError('The ID token has expired.');
       if (nonce !== undefined && c.nonce !== nonce) throw new SignInError('The ID token does not belong to this sign-in.');
+      if (nonce === undefined && this.account && String(c.sub) !== this.account.subject) throw new SignInError('The renewed token names another person.');
       this.idToken = body.id_token;
       this.account = {
         subject: String(c.sub), name: String(c.name ?? c.preferred_username ?? c.email ?? c.sub),
@@ -184,22 +225,29 @@ export class OidcTokenSource implements TokenSource {
     }
     this.access = body.access_token;
     if (body.refresh_token) this.refreshToken = body.refresh_token;
-    if (this.timer !== null) this.env.cancel(this.timer);
     const lifetime = (body.expires_in ?? 300) * 1000;
-    this.timer = this.env.later(() => { void this.refresh(); }, Math.max(5_000, lifetime - EARLY_MS));
+    this.expiresAt = this.env.now() + lifetime;
+    // Renewed before it expires when it can be; otherwise it lasts until it expires and the session then ends.
+    if (this.refreshToken) this.schedule(lifetime - EARLY_MS);
+    else { if (this.timer !== null) this.env.cancel(this.timer); this.timer = this.env.later(() => { this.timer = null; this.end(); }, lifetime); }
   }
 }
 
 async function discover(settings: OidcSettings, env: OidcEnv): Promise<Endpoints> {
   let doc: Endpoints;
   try {
-    const res = await env.fetch(`${trim(settings.issuer)}/.well-known/openid-configuration`, { headers: { Accept: 'application/json' } });
+    const res = await env.fetch(`${settings.issuer.replace(/\/+$/, '')}/.well-known/openid-configuration`, { headers: { Accept: 'application/json' } });
     if (!res.ok) throw new Error(String(res.status));
     doc = await res.json() as Endpoints;
   } catch {
     throw new SignInError(`The identity provider at ${settings.issuer} could not be reached.`);
   }
-  if (trim(doc.issuer ?? '') !== trim(settings.issuer)) throw new SignInError('The identity provider names another issuer than the one configured.');
+  if (doc.issuer !== settings.issuer) throw new SignInError('The identity provider names another issuer than the one configured.');
   if (!doc.authorization_endpoint || !doc.token_endpoint) throw new SignInError('The identity provider does not offer the authorization code flow.');
+  // Over TLS, unless the portal itself is served without it (a developer's machine).
+  const secure = env.location.href.startsWith('https:');
+  for (const url of [doc.issuer, doc.authorization_endpoint, doc.token_endpoint, doc.end_session_endpoint].filter(Boolean) as string[]) {
+    if (secure && !url.startsWith('https:')) throw new SignInError('The identity provider must be reached over HTTPS.');
+  }
   return doc;
 }

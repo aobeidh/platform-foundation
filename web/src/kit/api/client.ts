@@ -19,10 +19,17 @@ export class ApiClient {
       if (opts.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey;
       return this.transport.send({ method, path, body: opts.body, headers });
     };
+    const sentWith = this.tokens.token();
     let res = await send();
-    // A token that expired between renewals: renew it once and send again (the same idempotency key, so a write
-    // the service did apply is not applied twice).
-    if (res.status === 401 && this.tokens.refresh && (await this.tokens.refresh())) res = await send();
+    // A token that expired between renewals: the service refused it before running the call (TOKEN_EXPIRED comes
+    // from the authentication step), so sending it again after one renewal applies nothing twice. A token renewed
+    // while the call was under way is used at once. Other refusals (a token for another audience, a missing tenant)
+    // are not renewed: a new token would be refused the same way.
+    if (res.status === 401) {
+      const code = (res.body as { code?: string } | null)?.code;
+      if (this.tokens.token() !== sentWith && this.tokens.token()) res = await send();
+      else if (code === 'TOKEN_EXPIRED' && this.tokens.refresh && (await this.tokens.refresh())) res = await send();
+    }
     if (res.status < 200 || res.status >= 300) throw new ApiError(asProblem(res.status, res.body));
     return { data: res.body as T, etag: res.headers.etag, location: res.headers.location, status: res.status };
   }

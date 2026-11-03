@@ -7,7 +7,7 @@ import type { Transport } from './transport';
 const ISSUER = 'https://idp.example.com/realms/notes';
 const SETTINGS = { issuer: ISSUER, clientId: 'notes-portal', scopes: ['openid', 'profile'] };
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
-const jwt = (claims: Record<string, unknown>) => `${b64({ alg: 'RS256' })}.${b64(claims)}.sig`;
+const jwt = (claims: Record<string, unknown>) => `${b64({ alg: 'RS256' })}.${b64({ exp: 4_000_000_000, ...claims })}.sig`;
 
 /** A browser at the portal and an identity provider that answers like Keycloak. */
 function world(start = 'https://portal.example.com/app/?x=1#/items/notes') {
@@ -122,7 +122,7 @@ describe('signing in', () => {
 });
 
 describe('renewal', () => {
-  it('renews with the refresh token, and signs in again when that fails', async () => {
+  it('renews with the refresh token, and ends the session when that fails, without leaving the page', async () => {
     const w = world();
     void OidcTokenSource.start(SETTINGS, w.env);
     await new Promise((r) => setTimeout(r, 10));
@@ -132,11 +132,41 @@ describe('renewal', () => {
     expect(w.posts[1]).toMatchObject({ grant_type: 'refresh_token', refresh_token: 'rt-1' });
     expect(source.token()).toBe('at-2');
 
+    const before = w.assigned;
+    let told = 0;
+    source.subscribe(() => { told += 1; });
     w.answer(() => ({ status: 400, body: { error: 'invalid_grant' } }));
-    void source.refresh();
+    expect(await source.refresh()).toBe(false);
+    expect(source.ended).toBe(true);
+    expect(told).toBe(1);
+    expect(w.assigned).toBe(before);  // nothing left the page
+    expect(source.token()).toBe('at-2');  // it works until it expires
+    expect(await source.refresh()).toBe(false);  // and is not renewed again
+  });
+
+  it('tries again later when the provider cannot be reached', async () => {
+    const w = world();
+    void OidcTokenSource.start(SETTINGS, w.env);
     await new Promise((r) => setTimeout(r, 10));
-    expect(source.token()).toBeNull();
-    expect(new URL(w.assigned!).pathname).toBe('/realms/notes/auth');
+    w.back({ code: 'c-1' });
+    const source = await OidcTokenSource.start(SETTINGS, w.env);
+    w.answer(() => ({ status: 503, body: {} }));
+    expect(await source.refresh()).toBe(false);
+    expect(source.ended).toBe(false);
+    expect(w.timers.at(-1)!.ms).toBe(30_000);
+  });
+
+  it('without a refresh token, lets the token last and then ends the session', async () => {
+    const w = world();
+    void OidcTokenSource.start(SETTINGS, w.env);
+    await new Promise((r) => setTimeout(r, 10));
+    w.back({ code: 'c-1' });
+    w.answer((form) => ({ status: 200, body: { access_token: 'at', expires_in: 300, id_token: jwt({ iss: ISSUER, aud: 'notes-portal', sub: 'u', nonce: form.nonce }) } }));
+    const source = await OidcTokenSource.start(SETTINGS, w.env);
+    expect(w.timers.at(-1)!.ms).toBe(300_000);
+    w.timers.at(-1)!.fn();
+    expect(source.ended).toBe(true);
+    expect(w.posts.length).toBe(1);  // never a renewal it cannot make
   });
 
   it('ends the provider session on sign-out', async () => {
@@ -154,13 +184,45 @@ describe('renewal', () => {
   });
 });
 
+describe('the review\'s cases', () => {
+  it('never keeps a code in the address, even one no sign-in is waiting for', async () => {
+    const w = world('https://portal.example.com/app/?code=STALE&state=zz&x=1#/x');
+    void OidcTokenSource.start(SETTINGS, w.env);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(w.href).toBe('https://portal.example.com/app/?x=1#/x');
+    const pending = JSON.parse(w.store.get('pf-oidc-pending')!) as { returnTo: string };
+    expect(pending.returnTo).toBe('/app/?x=1#/x');
+  });
+
+  it('refuses a provider reached without TLS from a portal served with it', async () => {
+    const w = world();
+    const plain = { ...SETTINGS, issuer: 'http://idp.example.com/realms/notes' };
+    const real = w.env.fetch;
+    w.env.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => String(input).includes('well-known')
+      ? new Response(JSON.stringify({ issuer: plain.issuer, authorization_endpoint: 'http://idp.example.com/a', token_endpoint: 'http://idp.example.com/t' }))
+      : real(input, init)) as typeof fetch;
+    await expect(OidcTokenSource.start(plain, w.env)).rejects.toThrow('HTTPS');
+  });
+
+  it('refuses an expired ID token, and one issued to another client', async () => {
+    for (const bad of [{ exp: -100 }, { aud: ['notes-portal', 'other'], azp: 'other' }]) {
+      const w = world();
+      void OidcTokenSource.start(SETTINGS, w.env);
+      await new Promise((r) => setTimeout(r, 10));
+      w.back({ code: 'c-1' });
+      w.answer((form) => ({ status: 200, body: { access_token: 'at', id_token: jwt({ iss: ISSUER, aud: 'notes-portal', sub: 'u', nonce: form.nonce, ...bad }) } }));
+      await expect(OidcTokenSource.start(SETTINGS, w.env)).rejects.toThrow(SignInError);
+    }
+  });
+});
+
 describe('the session', () => {
   const transport = (status: number, body: unknown): Transport => ({ kind: 'http', send: async () => ({ status, headers: {}, body }) });
 
   it('follows what the service says', async () => {
     expect(await startSession({ kind: 'simulated', send: async () => ({ status: 500, headers: {}, body: null }) })).toEqual({ kind: 'demo' });
     expect(await startSession(transport(200, { method: 'demo' }))).toEqual({ kind: 'demo' });
-    expect(await startSession(transport(404, null))).toEqual({ kind: 'demo' });  // a service older than the route
+    expect(await startSession(transport(404, null))).toMatchObject({ kind: 'failed' });  // never demo by default
     expect(await startSession(transport(200, { method: 'none' }))).toEqual({ kind: 'none' });
     const w = world();
     w.env.fetch = (async () => { throw new Error('down'); }) as typeof fetch;
@@ -169,16 +231,24 @@ describe('the session', () => {
 });
 
 describe('the API client', () => {
-  it('renews once after a 401 and sends again with the same idempotency key', async () => {
+  it('renews once after an expired token and sends again with the same idempotency key', async () => {
     const { ApiClient } = await import('./client');
     const sent: Record<string, string>[] = [];
     let token = 'old';
+    let code = 'TOKEN_EXPIRED';
     const t: Transport = { kind: 'http', send: async (req) => {
       sent.push(req.headers ?? {});
-      return req.headers?.Authorization === 'Bearer new' ? { status: 200, headers: {}, body: { ok: true } } : { status: 401, headers: {}, body: { code: 'TOKEN_EXPIRED' } };
+      return req.headers?.Authorization === 'Bearer new' ? { status: 200, headers: {}, body: { ok: true } } : { status: 401, headers: {}, body: { code } };
     } };
     const api = new ApiClient(t, { token: () => token, refresh: async () => { token = 'new'; return true; } });
     expect((await api.call('POST', '/api/v1/x', { idempotencyKey: 'k-1' })).data).toEqual({ ok: true });
     expect(sent.map((h) => [h.Authorization, h['Idempotency-Key']])).toEqual([['Bearer old', 'k-1'], ['Bearer new', 'k-1']]);
+    // A token refused for another reason is not renewed: a new one would be refused the same way.
+    token = 'old'; code = 'TOKEN_INVALID'; sent.length = 0;
+    let renewed = 0;
+    const other = new ApiClient(t, { token: () => token, refresh: async () => { renewed += 1; return true; } });
+    await expect(other.call('GET', '/api/v1/x')).rejects.toThrow();
+    expect(renewed).toBe(0);
+    expect(sent.length).toBe(1);
   });
 });

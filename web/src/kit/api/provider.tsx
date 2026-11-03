@@ -15,6 +15,9 @@ interface ApiContextValue {
   /** The person signed in through an identity provider, or null with demo identities. */
   account: Account | null;
   signOut: (() => void) | null;
+  /** True once the signed-in session cannot be renewed; `signIn` then starts a new one. */
+  sessionEnded: boolean;
+  signIn: (() => void) | null;
   simulated: SimulatedTransport | null;
 }
 
@@ -46,11 +49,15 @@ export function ApiProvider({ transport, identities = [], initialIdentity, token
   if (demo && identity) demo.set(identity);
   const [none] = useState<TokenSource>(() => ({ token: () => null }));
   const tokens: TokenSource = signedIn ?? demo ?? none;
+  const [ended, setEnded] = useState(() => !!signedIn?.ended);
+  useEffect(() => signedIn?.subscribe?.(() => setEnded(!!signedIn.ended)), [signedIn]);
   const api = useMemo(() => new ApiClient(transport, tokens), [transport, tokens]);
 
   const value = useMemo<ApiContextValue>(() => ({
     api, transport, identity, identities: signedIn ? [] : identities, account: signedIn ? account : null,
     signOut: signedIn && onSignOut ? () => { client.clear(); onSignOut(); } : null,
+    sessionEnded: ended,
+    signIn: signedIn?.signIn ? () => signedIn.signIn!() : null,
     simulated: transport.kind === 'simulated' ? (transport as SimulatedTransport) : null,
     setIdentity: (id: string) => {
       if (signedIn) return;
@@ -58,7 +65,7 @@ export function ApiProvider({ transport, identities = [], initialIdentity, token
       setIdentityId(id);
       client.clear(); // nothing cached for one person may show for another
     },
-  }), [api, transport, identity, identities, signedIn, account, onSignOut, client]);
+  }), [api, transport, identity, identities, signedIn, account, onSignOut, client, ended]);
 
   return (
     <QueryClientProvider client={client}>

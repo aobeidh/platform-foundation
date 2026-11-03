@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useApi, useMe } from '@/kit/api';
 import { Avatar, AvatarFallback } from '@/ui/atoms/avatar';
 import { Button } from '@/ui/atoms/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/ui/atoms/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/atoms/popover';
 
 const initials = (n: string) => n.split(/[\s.@_-]+/).filter(Boolean).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
@@ -60,5 +61,30 @@ export function SignInProblem({ reason, onRetry }: { reason: string | null; onRe
         {onRetry && <div><Button onClick={onRetry}>{t('account.retry')}</Button></div>}
       </div>
     </main>
+  );
+}
+
+/**
+ * Asks the person to sign in again once their session cannot be renewed. Nothing on the page is lost until they
+ * choose to; until then the page stays, and calls the service refuses show their own problems.
+ */
+export function SessionEnded() {
+  const { t } = useTranslation();
+  const { sessionEnded, signIn } = useApi();
+  const [later, setLater] = useState(false);
+  if (!sessionEnded || !signIn) return null;
+  return (
+    <Dialog open={!later} onOpenChange={(o) => setLater(!o)}>
+      <DialogContent className="glass-strong sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t('account.ended')}</DialogTitle>
+          <DialogDescription>{t('account.ended.d')}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setLater(true)}>{t('account.later')}</Button>
+          <Button onClick={signIn}>{t('account.retry')}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

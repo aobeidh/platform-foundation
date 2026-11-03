@@ -3,8 +3,14 @@
 
 export interface TokenSource {
   token(): string | null;
-  /** Renews the token after the service refused it as unauthenticated; false when it cannot. Optional. */
+  /** Renews the token after the service refused it as expired; false when it cannot. Never leaves the page. */
   refresh?(): Promise<boolean>;
+  /** True once the session cannot be renewed: the person must sign in again. */
+  readonly ended?: boolean;
+  /** Calls `fn` when `ended` changes; returns the unsubscribe function. */
+  subscribe?(fn: () => void): () => void;
+  /** Sends the person to sign in again, back to the page they are on. */
+  signIn?(): void;
 }
 
 /** The person signed in through an identity provider, as the portal shows them. */

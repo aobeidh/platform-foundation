@@ -3,7 +3,7 @@ import { HashRouter, Route, Routes, useNavigate, useParams } from 'react-router-
 import { Activity, Boxes, CheckCheck, Gauge, Languages, Moon, Palette, Plug, RotateCcw, ShieldCheck, Sun, Workflow, Zap } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApi, useCan, useMe, useOperations, useRecords, type Connection } from '@/kit/api';
-import { AccountMenu, IdentitySwitcher } from '@/kit/governed';
+import { AccountMenu, IdentitySwitcher, SessionEnded } from '@/kit/governed';
 import { Button } from '@/ui/atoms/button';
 import { CountBadge } from '@/ui/atoms/misc';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/ui/atoms/tooltip';
@@ -115,6 +115,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <IconAction label={t('shell.theme')} onClick={toggleTheme}>{theme === 'dark' ? <Sun /> : <Moon />}</IconAction>
       {demoIdentity && <IdentitySwitcher />}
       <AccountMenu />
+      <SessionEnded />
     </>
   );
 

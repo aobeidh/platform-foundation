@@ -153,3 +153,16 @@ def test_sign_in_is_public_only_at_its_exact_path():
     assert c.get("/api/v1/portal/sign-in/x").status_code in (401, 404)
     assert c.get("/api/v1/portal/sign-inx").status_code in (401, 404)
     p.close()
+
+
+def test_a_portal_client_needs_an_https_issuer_in_production():
+    import pytest
+    from platform_kernel.platform import ConfigurationError
+
+    with pytest.raises(ConfigurationError) as e:
+        settings = PlatformSettings(service="notes", environment="production", egress_allowlist=("idp",))
+        (Platform.builder("notes", settings)
+         .with_oidc(issuer="http://idp/realms/notes", audience="notes", jwks_url="https://idp/certs",
+                    portal_client_id="p")
+         .build())
+    assert any("https" in p for p in e.value.problems)

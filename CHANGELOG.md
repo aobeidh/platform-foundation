@@ -8,9 +8,11 @@
 - `EGRESS_ALLOW_PRIVATE` and `EGRESS_ALLOW_PLAIN_HTTP` fill the egress policy's exceptions, for an identity provider
   inside the cluster. Plain HTTP is refused when `ENVIRONMENT=production`.
 - web-kit: `OidcTokenSource` (Authorization Code with PKCE, tokens in memory, renewal with the refresh token, sign-out
-  through the provider), `startSession(transport)`, `ApiProvider` with `tokens` and `account`, `AccountMenu` and
-  `SignInProblem`. `TokenSource.refresh` is optional; `ApiClient` renews once after a 401 and sends again.
-  `useApi().identity` is `null` when people sign in through a provider.
+  through the provider; it never leaves the page by itself), `startSession(transport)`, `ApiProvider` with `tokens`
+  and `account`, `AccountMenu`, `SessionEnded` and `SignInProblem`. `TokenSource` gains optional `refresh`, `ended`,
+  `subscribe` and `signIn`; `ApiClient` renews once after `TOKEN_EXPIRED` and sends again. `useApi().identity` is
+  `null` when people sign in through a provider.
+- An OIDC issuer for a portal client must use https when `ENVIRONMENT=production`.
 
 ### platform-kernel
 - Public routes: `create_app(public_routers=...)` (and `Platform.create_app`) take routers whose routes authenticate

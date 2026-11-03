@@ -352,6 +352,11 @@ class PlatformBuilder:
                                               allow_plain_http=s.egress_allow_plain_http)
         if s.production and egress.allow_plain_http:
             problems.append("EGRESS_ALLOW_PLAIN_HTTP is not allowed when ENVIRONMENT=production")
+        portal_client = self._oidc["portal_client_id"] if self._oidc else None
+        if s.production and portal_client and not self._oidc["issuer"].startswith("https://"):  # type: ignore[index]
+            # The portal signs people in from the browser: in production its provider is reached over TLS only.
+            problems.append("the OIDC issuer must use https when a portal client signs people in and "
+                            "ENVIRONMENT=production")
         if self._oidc is not None and self._verifier is None:
             from urllib.parse import urlsplit
 
