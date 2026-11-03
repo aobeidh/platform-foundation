@@ -140,7 +140,9 @@ class Platform:
         return [governed_router(self.governance, k.kind, self.authz) for k in self.governance.kinds()]
 
     def create_app(self, routers: Iterable[APIRouter] = (), *, include_governed: bool = True,
-                   readiness: dict[str, Callable[[], bool]] | None = None, version: str = "0.1.0") -> FastAPI:
+                   readiness: dict[str, Callable[[], bool]] | None = None, version: str = "0.1.0",
+                   public_prefixes: tuple[str, ...] = ()) -> FastAPI:
+        """`public_prefixes`: paths whose routes authenticate callers themselves (see HttpSettings)."""
         from .portal import portal_router
 
         all_routers = (list(routers) + (self.governed_routers() if include_governed else [])
@@ -152,7 +154,7 @@ class Platform:
             settings=HttpSettings(service=self.settings.service,
                                   request_timeout=timedelta(seconds=self.settings.request_timeout_seconds),
                                   max_body_bytes=self.settings.max_body_bytes, simulated=self.simulated,
-                                  production=self.settings.production),
+                                  production=self.settings.production, public_prefixes=tuple(public_prefixes)),
             verifier=self.verifier, catalog=self.errors, idempotency=self.idempotency, routers=all_routers,
             readiness=probes, version=version)
 

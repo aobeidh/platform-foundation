@@ -38,9 +38,11 @@ PUBLIC_PATHS = frozenset({"/health/live", "/health/ready", "/openapi.json", "/do
 REPLAY_HEADERS = ("etag", "location", "content-type")
 
 
-def is_public(path: str) -> bool:
-    """Exact match only: a prefix match would let '/docs-admin' skip authentication."""
-    return path in PUBLIC_PATHS
+def is_public(path: str, prefixes: tuple[str, ...] = ()) -> bool:
+    """The kernel's public paths match exactly: a prefix match would let '/docs-admin' skip authentication. An app's
+    public prefixes (HttpSettings.public_prefixes) end with a slash, so '/hooks/' covers '/hooks/x' but never
+    '/hooks-admin', and a path must go past the prefix."""
+    return path in PUBLIC_PATHS or any(path.startswith(p) and len(path) > len(p) for p in prefixes)
 
 
 class DomainException(Exception):
@@ -58,6 +60,16 @@ class HttpSettings:
     max_body_bytes: int = 1_048_576
     simulated: list[str] = field(default_factory=list)
     production: bool = False
+    # Paths under these prefixes skip token authentication: their routes must authenticate the caller themselves (a
+    # webhook signature, for example). They run as an anonymous principal whose tenant scope matches no tenant; the
+    # deadline, body limit, correlation id, problem details and metrics still apply, idempotency does not.
+    public_prefixes: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        for p in self.public_prefixes:
+            if not p.startswith("/") or not p.endswith("/") or len(p) < 3 or "//" in p:
+                raise ValueError("A public prefix starts and ends with a slash and names a path, "
+                                 f"like '/hooks/': {p!r}")
 
 
 def problem_response(catalog: ErrorCatalog, error: DomainError, *, instance: str | None = None,
@@ -163,7 +175,7 @@ class PlatformMiddleware:
                 return {"type": "http.request", "body": body, "more_body": False}
             return await receive()
 
-        public = is_public(path)
+        public = is_public(path, self.s.public_prefixes)
         # 5 authentication and context
         if public:
             from ..context import Principal

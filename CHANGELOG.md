@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 (unreleased)
+
+### platform-kernel
+- Public routes for an app: `HttpSettings.public_prefixes` and `create_app(public_prefixes=...)` name path prefixes
+  (ending with a slash) whose routes authenticate callers themselves, such as webhook receivers. They run as an
+  anonymous principal with a scope that matches no tenant; the rest of the stack still applies, idempotency excepted.
+
 ## 0.4.0 (unreleased)
 
 ### platform-kernel

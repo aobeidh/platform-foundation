@@ -206,3 +206,37 @@ def test_response_size_limit():
     with pytest.raises(OutboundError) as e:
         c.request("GET", "/x")
     assert e.value.error.code == "PAYLOAD_TOO_LARGE"
+
+
+def test_public_prefixes_skip_tokens_but_keep_the_stack():
+    """Routes under an app's public prefix authenticate callers themselves; nothing else becomes public."""
+    r = APIRouter()
+
+    @r.post("/hooks/{name}")
+    def hook(name: str, body: dict) -> dict:
+        ctx = ctxmod.current()
+        return {"name": name, "kind": ctx.principal.kind, "tenant": ctx.tenant.tenant,
+                "correlation": ctx.correlation_id}
+
+    @r.get("/hooks-admin")
+    def admin() -> dict:
+        return {"secret": True}
+
+    db = MemoryUnitOfWorkFactory().db
+    app = create_app(settings=HttpSettings(service="test", max_body_bytes=200, public_prefixes=("/hooks/",)),
+                     verifier=DemoTokenVerifier(), catalog=kernel_catalog(), idempotency=MemoryIdempotencyStore(db),
+                     routers=[r])
+    client = TestClient(app)
+    ok = client.post("/hooks/orders", json={"a": 1}, headers={"X-Correlation-Id": "c-1"})
+    assert ok.status_code == 200 and ok.json()["kind"] == "anonymous" and ok.json()["correlation"] == "c-1"
+    assert ok.json()["tenant"] != "retail"  # a scope that matches no tenant
+    assert client.get("/hooks-admin").status_code == 401  # a sibling path is not public
+    assert client.post("/hooks/", json={}).status_code == 401  # the prefix itself is not a public path
+    too_big = client.post("/hooks/orders", content=b"x" * 500, headers={"content-type": "application/json"})
+    assert too_big.status_code == 413
+
+
+@pytest.mark.parametrize("bad", ["/hooks", "hooks/", "/", "//", "/a//b/"])
+def test_a_public_prefix_must_name_a_path_and_end_with_a_slash(bad):
+    with pytest.raises(ValueError):
+        HttpSettings(service="test", public_prefixes=(bad,))
