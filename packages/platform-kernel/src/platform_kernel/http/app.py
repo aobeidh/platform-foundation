@@ -17,10 +17,12 @@ import anyio
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.routing import Match
 
 from .. import context as ctxmod
-from ..context import RequestContext, TenantScope
+from ..context import ANONYMOUS, RequestContext, TenantScope, reserved
 from ..contracts import Problem
 from ..core import ConcurrencyConflict, DomainError, FieldError, NotFound, new_id
 from ..errors import ErrorCatalog
@@ -38,8 +40,21 @@ PUBLIC_PATHS = frozenset({"/health/live", "/health/ready", "/openapi.json", "/do
 REPLAY_HEADERS = ("etag", "location", "content-type")
 
 
+KERNEL_PREFIXES = ("/api/", "/health/", "/docs", "/redoc", "/openapi.json")
+
+
+def route_path(scope: dict) -> str:
+    """The path the router matches: the request path without the app's root path (a mount, or a proxy prefix)."""
+    path, root = scope["path"], scope.get("root_path", "")
+    if not root or not path.startswith(root):
+        return path
+    if path == root:
+        return "/"
+    return path[len(root):] if path[len(root)] == "/" else path
+
+
 def is_public(path: str) -> bool:
-    """Exact match only: a prefix match would let '/docs-admin' skip authentication."""
+    """The kernel's public paths match exactly: a prefix match would let '/docs-admin' skip authentication."""
     return path in PUBLIC_PATHS
 
 
@@ -82,8 +97,25 @@ def _parse_deadline(value: str | None, default: timedelta, now: datetime) -> dat
 
 class PlatformMiddleware:
     def __init__(self, app: Any, *, settings: HttpSettings, verifier: TokenVerifier, catalog: ErrorCatalog,
-                 idempotency: IdempotencyStore | None) -> None:
+                 idempotency: IdempotencyStore | None, router: Any = None, public_routes: tuple[Any, ...] = ()) -> None:
         self.app, self.s, self.verifier, self.catalog, self.idem = app, settings, verifier, catalog, idempotency
+        # The app's router, read on every request (its routes may be replaced), and the route objects that are public,
+        # held strongly so their identity can never pass to another route.
+        self._router, self._public = router, public_routes
+
+    def _is_public(self, scope: dict) -> bool:
+        """Public when the kernel's own public path is asked for exactly, or when the route the router will run is one
+        the app declared public. Deciding by the route, not the path's text, means a protected route that matches the
+        path first keeps its authentication, and a mount or a root path cannot make another route public."""
+        if is_public(route_path(scope)):
+            return True
+        if not self._public or self._router is None:
+            return False
+        for route in self._router.routes:
+            match, _ = route.matches(scope)
+            if match is Match.FULL:
+                return any(route is p for p in self._public)
+        return False
 
     async def _send_problem(self, send: Any, error: DomainError, correlation_id: str,
                             extra: dict[str, str] | None = None) -> None:
@@ -101,6 +133,10 @@ class PlatformMiddleware:
         await send({"type": "http.response.body", "body": raw})
 
     async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        if scope["type"] == "websocket":
+            # The stack authenticates HTTP requests only; a websocket would reach its handler with no principal.
+            await send({"type": "websocket.close", "code": 1008, "reason": "This service does not serve websockets."})
+            return
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -163,12 +199,10 @@ class PlatformMiddleware:
                 return {"type": "http.request", "body": body, "more_body": False}
             return await receive()
 
-        public = is_public(path)
+        public = self._is_public(scope)
         # 5 authentication and context
         if public:
-            from ..context import Principal
-
-            principal = Principal(subject="anonymous", kind="anonymous", tenant=None)
+            principal = ANONYMOUS
         else:
             auth = headers.get("authorization", "")
             if not auth.lower().startswith("bearer "):
@@ -181,6 +215,11 @@ class PlatformMiddleware:
                 await self._send_problem(send, verified.error, correlation_id, {"www-authenticate": "Bearer"})
                 return
             principal = verified.value
+            if reserved(principal):
+                # The anonymous caller and the partners public routes act as exist only inside the kernel.
+                await self._send_problem(send, DomainError("TOKEN_INVALID", "The token names a reserved principal."),
+                                         correlation_id, {"www-authenticate": "Bearer"})
+                return
         # 6 tenant scope
         scope_ = TenantScope.resolve(principal, headers.get("x-tenant-id"))
         ctx = RequestContext(principal=principal, tenant=scope_, correlation_id=correlation_id, deadline=deadline,
@@ -341,9 +380,23 @@ def _install_handlers(app: FastAPI, catalog: ErrorCatalog) -> None:
                                 instance=request.url.path)
 
 
+def _check_public(path: str) -> None:
+    """A public route has a literal first segment outside the kernel's paths, so it can never stand in for them."""
+    first = path.split("/")[1] if path.count("/") >= 1 else ""
+    kernel = any(path == k.rstrip("/") or path.startswith(k) for k in KERNEL_PREFIXES)
+    if not path.startswith("/") or not first or "{" in first or kernel:
+        raise ValueError("A public route starts with a fixed segment outside /api, /health and the docs, like "
+                         f"'/hooks/{{name}}': {path!r}")
+
+
 def create_app(*, settings: HttpSettings, verifier: TokenVerifier, catalog: ErrorCatalog,
                idempotency: IdempotencyStore | None, routers: Iterable[APIRouter] = (),
-               readiness: dict[str, Callable[[], bool]] | None = None, version: str = "0.1.0") -> FastAPI:
+               readiness: dict[str, Callable[[], bool]] | None = None, version: str = "0.1.0",
+               public_routers: Iterable[APIRouter] = ()) -> FastAPI:
+    """`public_routers` hold routes that authenticate their callers themselves (a webhook signature, for example).
+    They skip token authentication and run as the anonymous principal, whose tenant scope matches no tenant, until
+    the route calls `context.as_partner`. The deadline, body limit, correlation id, tracing, problem details and
+    metrics still apply; idempotency does not."""
     app = FastAPI(title=settings.service, version=version)
     _install_handlers(app, catalog)
     probes = readiness or {}
@@ -366,6 +419,21 @@ def create_app(*, settings: HttpSettings, verifier: TokenVerifier, catalog: Erro
 
     for r in routers:
         app.include_router(r)
+    public: list[Any] = []
+    for r in public_routers:
+        # A snapshot of the routes as checked: what is added to the router later never becomes public.
+        snapshot = APIRouter()
+        for route in list(r.routes):
+            if not isinstance(route, APIRoute):
+                raise ValueError("A public router holds only its own API routes, not other routers, mounts or "
+                                 "websockets.")
+            _check_public(route.path)
+            snapshot.routes.append(route)
+        before = len(app.router.routes)
+        app.include_router(snapshot)
+        # What the include added to the app's routes (the snapshot, or copies of its routes): the middleware treats a
+        # request as public only when one of these is the first full match.
+        public += app.router.routes[before:]
     app.add_middleware(PlatformMiddleware, settings=settings, verifier=verifier, catalog=catalog,
-                       idempotency=idempotency)
+                       idempotency=idempotency, router=app.router, public_routes=tuple(public))
     return app

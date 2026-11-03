@@ -140,7 +140,9 @@ class Platform:
         return [governed_router(self.governance, k.kind, self.authz) for k in self.governance.kinds()]
 
     def create_app(self, routers: Iterable[APIRouter] = (), *, include_governed: bool = True,
-                   readiness: dict[str, Callable[[], bool]] | None = None, version: str = "0.1.0") -> FastAPI:
+                   readiness: dict[str, Callable[[], bool]] | None = None, version: str = "0.1.0",
+                   public_routers: Iterable[APIRouter] = ()) -> FastAPI:
+        """`public_routers`: routes that authenticate their callers themselves (see http.create_app)."""
         from .portal import portal_router
 
         all_routers = (list(routers) + (self.governed_routers() if include_governed else [])
@@ -154,7 +156,7 @@ class Platform:
                                   max_body_bytes=self.settings.max_body_bytes, simulated=self.simulated,
                                   production=self.settings.production),
             verifier=self.verifier, catalog=self.errors, idempotency=self.idempotency, routers=all_routers,
-            readiness=probes, version=version)
+            readiness=probes, version=version, public_routers=public_routers)
 
     def migrate(self) -> list[str]:
         """Apply kernel and product migrations. Run as the migration role, not the application role (P7)."""
