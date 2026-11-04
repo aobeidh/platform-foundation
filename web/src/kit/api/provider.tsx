@@ -4,6 +4,7 @@ import { ApiClient } from './client';
 import { DemoTokenSource, type Account, type DemoIdentity, type TokenSource } from './identity';
 import type { Transport } from './transport';
 import type { SimulatedTransport } from './simulated/server';
+import { useStorageKey } from '@/lib/mount';
 
 interface ApiContextValue {
   api: ApiClient;
@@ -38,11 +39,12 @@ export function ApiProvider({ transport, identities = [], initialIdentity, token
   transport: Transport; identities?: DemoIdentity[]; initialIdentity?: string;
   tokens?: TokenSource; account?: Account | null; onSignOut?: () => void; children: React.ReactNode;
 }) {
+  const identityKey = useStorageKey('pf-identity');
   const [client] = useState(() => new QueryClient({
     defaultOptions: { queries: { staleTime: 2_000, retry: (n, e) => n < 1 && !(e && 'status' in e && (e as { status: number }).status < 500) } },
   }));
   const [identityId, setIdentityId] = useState(() => {
-    try { return localStorage.getItem('pf-identity') ?? initialIdentity ?? identities[0]?.id; } catch { return initialIdentity ?? identities[0]?.id; }
+    try { return localStorage.getItem(identityKey) ?? initialIdentity ?? identities[0]?.id; } catch { return initialIdentity ?? identities[0]?.id; }
   });
   const identity = signedIn ? null : identities.find((i) => i.id === identityId) ?? identities[0] ?? null;
   const [demo] = useState(() => (identity ? new DemoTokenSource(identity) : null));
@@ -65,11 +67,11 @@ export function ApiProvider({ transport, identities = [], initialIdentity, token
     simulated: transport.kind === 'simulated' ? (transport as SimulatedTransport) : null,
     setIdentity: (id: string) => {
       if (signedIn) return;
-      try { localStorage.setItem('pf-identity', id); } catch { /* unavailable */ }
+      try { localStorage.setItem(identityKey, id); } catch { /* unavailable */ }
       setIdentityId(id);
       client.clear(); // nothing cached for one person may show for another
     },
-  }), [api, transport, identity, identities, signedIn, account, onSignOut, client, ended]);
+  }), [api, transport, identity, identities, signedIn, account, onSignOut, client, ended, identityKey]);
 
   return (
     <QueryClientProvider client={client}>

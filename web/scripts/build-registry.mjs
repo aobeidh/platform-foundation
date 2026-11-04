@@ -15,7 +15,7 @@ const list = (dir) => fs.readdirSync(path.join(root, dir)).filter((f) => /\.tsx?
 
 const groups = {
   theme: ['src/styles/tokens.css', 'src/styles/globals.css'],
-  utils: ['src/lib/utils.ts'], format: ['src/lib/format.ts'], prefs: ['src/lib/prefs.tsx'],
+  utils: ['src/lib/utils.ts'], format: ['src/lib/format.ts'], prefs: ['src/lib/prefs.tsx'], mount: ['src/lib/mount.tsx'],
   i18n: ['src/i18n/index.ts', 'src/i18n/strings.ts'],
   echart: ['src/ui/charts/echarts.ts', 'src/ui/charts/theme.ts', 'src/ui/charts/tooltip.ts', 'src/ui/charts/echart.tsx'],
   'viz-utils': ['src/ui/viz/use-width.ts'],

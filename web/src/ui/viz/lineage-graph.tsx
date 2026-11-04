@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useMountRoot } from '@/lib/mount';
 import { cn } from '@/lib/utils';
 import { useInView, useWidth } from './use-width';
 
@@ -19,7 +20,7 @@ export function LineageGraph({ nodes, edges, ariaLabel }: { nodes: LineageNode[]
   const cardW = Math.max(132, Math.min(176, (Math.max(width, 560) - pad * 2 - gap * (cols - 1)) / cols));
   const cardH = 58;
   const rowGap = 14;
-  const rtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+  const rtl = useMountRoot().dir === 'rtl';
   const pos = useMemo(() => {
     const byCol = new Map<number, LineageNode[]>();
     nodes.forEach((n) => byCol.set(n.col, [...(byCol.get(n.col) ?? []), n]));

@@ -2,6 +2,7 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react"
 import { Select as SelectPrimitive } from "radix-ui"
+import { useOverlayContainer } from "@/lib/mount"
 
 function Select({
   ...props
@@ -50,12 +51,15 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
-  position = "item-aligned",
+  position: asked,
   align = "center",
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
+  const container = useOverlayContainer()
+  // Item-aligned placement works in window coordinates, which a mounted portal's box does not share.
+  const position = asked ?? (container ? "popper" : "item-aligned")
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal container={container}>
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(
