@@ -181,7 +181,7 @@ class SqliteOperationStore:
 
         if not uow.platform_scope and (op.tenant is None or op.tenant != uow.tenant):
             raise PermissionError("the operation is outside the unit of work's tenant scope")
-        uow.connection.execute(text(
+        result = uow.connection.execute(text(
             "insert into operation (id, kind, tenant_id, status, progress, input, state, result, error, "
             "cancel_requested, created_by, created_roles, correlation_id, lease_owner, lease_until, created_at, "
             "updated_at) values (:id, :kind, :tenant, :status, :progress, :input, :state, :result, :error, :cancel, "
@@ -194,6 +194,9 @@ class SqliteOperationStore:
             self._changing(op) | {"kind": op.kind, "tenant": op.tenant, "input": json.dumps(op.input, default=str),
                                   "by": op.created_by, "roles": json.dumps(sorted(op.created_roles)),
                                   "corr": op.correlation_id, "ca": to_text(op.created_at)} | scope_params(uow))
+        if result.rowcount != 1:
+            # The id exists in another tenant: PostgreSQL's row-level security refuses this write too.
+            raise PermissionError("the operation is outside the unit of work's tenant scope")
 
     def unfinished(self, uow: Any) -> list[Operation]:
         from sqlalchemy import text

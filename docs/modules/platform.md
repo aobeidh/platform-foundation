@@ -8,7 +8,7 @@
 
 **Ports and API:** `Platform.builder(service, settings)` with `with_identity`, `with_capabilities`, `with_roles`, `with_governed_kinds`, `with_plugin_kind`, `with_provider`, `with_migrations`, `with_secrets`, `with_egress`, `with_errors`, `with_expressions`, `with_oidc`, `with_oauth`; then `build()`, `create_app()`, `migrate()`, `service_client()` (acts for the caller through token exchange and refuses without a caller token, or as the service; `with_oidc(platform_roles=...)` names the staff roles allowed without a tenant claim), `expressions`, `operations`, `capabilities`. Every app also serves the portal API under `/api/v1/portal` (`me`, `kinds`, `plugins`) that `@platform/web-kit` reads (ADR 0005).
 
-**Providers:** Chooses persistence by `PROVIDER_PERSISTENCE` (`memory`, `postgres` or `sqlite`). Without it, `default_persistence(DATABASE_URL)` decides: sqlite when `DATABASE_URL` starts with `sqlite:`, postgres for any other `DATABASE_URL`, otherwise memory. Products can use the same function for the defaults of their own ports.
+**Providers:** Chooses persistence by `PROVIDER_PERSISTENCE` (`memory`, `postgres` or `sqlite`). Without it, `default_persistence(DATABASE_URL)` decides: sqlite when the URL's SQLAlchemy backend is `sqlite` (`sqlite:///x.db`, `sqlite+pysqlite:///x.db`), postgres for any other `DATABASE_URL`, otherwise memory. The postgres provider refuses a backend other than `postgresql`. Products can use the same function for the defaults of their own ports.
 
 **Example:**
 

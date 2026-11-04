@@ -65,8 +65,9 @@ create table if not exists governed_record (
   primary key (kind, id)
 );
 
--- edited_by is a JSON array of subjects. SQLite cannot test membership of an array in a check constraint, so the
--- store enforces the maker-checker rule (P14) in code before every write; this check covers the other two authors.
+-- edited_by is a JSON array of subjects. P14: nobody who authored, edited or submitted a version may approve it.
+-- The check covers the creator and the submitter; a check constraint cannot hold a subquery, so the triggers below
+-- refuse an editor. The store enforces the same rule in code before every write.
 create table if not exists governed_version (
   kind text not null,
   id text not null,
@@ -87,3 +88,17 @@ create table if not exists governed_version (
       approved_by <> created_by
       and approved_by is not submitted_by))
 );
+
+create trigger if not exists maker_checker_second_person_insert before insert on governed_version
+when new.maker_checker and new.approved_by is not null
+  and exists (select 1 from json_each(new.edited_by) where value = new.approved_by)
+begin
+  select raise(abort, 'maker_checker_second_person: the approver edited this version');
+end;
+
+create trigger if not exists maker_checker_second_person_update before update on governed_version
+when new.maker_checker and new.approved_by is not null
+  and exists (select 1 from json_each(new.edited_by) where value = new.approved_by)
+begin
+  select raise(abort, 'maker_checker_second_person: the approver edited this version');
+end;

@@ -61,8 +61,8 @@ class UnitOfWorkContract:
 
 
 class JoiningUnitOfWorkContract:
-    """For providers where a unit of work opened in a thread that already holds one joins it (SQLite: one writer
-    per database file). Needs fixtures: uow_factory, outbox_reader."""
+    """For providers where a unit of work opened in a thread that already holds one joins it as a savepoint (SQLite:
+    one writer per database file). Needs fixtures: uow_factory, outbox_reader."""
 
     def test_nested_unit_of_work_sees_the_outer_uncommitted_write(self, uow_factory):
         with uow_factory(platform_scope=True) as outer:
@@ -74,16 +74,30 @@ class JoiningUnitOfWorkContract:
         with uow_factory(platform_scope=True) as uow:
             assert uow.inbox.first_time("c1", "e2") is False  # the inner write committed with the outer
 
-    def test_an_exception_in_the_inner_rolls_back_the_whole(self, uow_factory, outbox_reader):
-        e = sample_event()
+    def test_an_exception_in_the_inner_rolls_back_only_the_inner(self, uow_factory, outbox_reader):
+        before, after = sample_event(), sample_event()
         with uow_factory(platform_scope=True) as outer:
-            outer.events.publish([e])
+            outer.events.publish([before])
             try:
                 with uow_factory(platform_scope=True) as inner:
-                    inner.inbox.first_time("c1", "e1")
+                    inner.inbox.first_time("c1", "inner")
                     raise RuntimeError("inner failed")
             except RuntimeError:
-                pass  # the outer exits cleanly, but it is rollback-only now
+                pass  # the outer carries on: only the inner's writes are undone
+            assert outer.inbox.first_time("c1", "inner") is True
+            outer.events.publish([after])
+        assert [r.id for r in outbox_reader.claim(10)] == [before.id, after.id]
+        with uow_factory(platform_scope=True) as uow:
+            assert uow.inbox.first_time("c1", "inner") is False  # the outer's own mark committed
+
+    def test_an_exception_that_leaves_both_rolls_back_both(self, uow_factory, outbox_reader):
+        import pytest
+
+        with pytest.raises(RuntimeError), uow_factory(platform_scope=True) as outer:
+            outer.events.publish([sample_event()])
+            with uow_factory(platform_scope=True) as inner:
+                inner.inbox.first_time("c1", "e1")
+                raise RuntimeError("inner failed")
         assert outbox_reader.claim(10) == []
         with uow_factory(platform_scope=True) as uow:
             assert uow.inbox.first_time("c1", "e1") is True

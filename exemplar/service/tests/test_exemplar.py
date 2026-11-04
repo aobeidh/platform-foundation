@@ -162,6 +162,19 @@ def test_activation_repository_contract(system):
         assert [a.event_id for a in repo.list(uow)] == [a1.event_id]
 
 
+def test_sqlite_repository_refuses_another_tenants_activation(tmp_path):
+    from exemplar_connections.wiring import MIGRATIONS
+    from platform_kernel.persistence.sqlite import SqliteUnitOfWorkFactory
+    from platform_testing import fresh_sqlite
+
+    for engine in fresh_sqlite(tmp_path, [MIGRATIONS]):
+        p = Principal("x", tenant="t1")
+        ctx = RequestContext(principal=p, tenant=TenantScope.resolve(p), correlation_id="c",
+                             deadline=datetime.now(UTC).replace(year=2100))
+        with ctxmod.use(ctx), SqliteUnitOfWorkFactory(engine)() as uow, pytest.raises(PermissionError):
+            SqliteActivationRepository().add(uow, _activation("t2"))
+
+
 def test_send_batch_runs_as_an_operation_with_progress(system):
     platform, client = system
     cid = make_active(client, prefix="b:")

@@ -77,8 +77,17 @@ def create_engine(url: str, *, busy_timeout: timedelta = DEFAULT_BUSY_TIMEOUT) -
         raise RuntimeError(f"the SQLite provider needs SQLite {'.'.join(map(str, _MIN_SQLITE))} or later; this "
                            f"Python has {sqlite3.sqlite_version}")
     parsed = make_url(url)
-    if parsed.get_backend_name() != "sqlite":
-        raise ValueError(f"{parsed.render_as_string(hide_password=True)!r} is not a sqlite:/// URL")
+    if parsed.get_backend_name() != "sqlite" or parsed.get_driver_name() != "pysqlite":
+        raise ValueError(f"{parsed.render_as_string(hide_password=True)!r} is not a sqlite:/// URL for Python's "
+                         f"sqlite3 driver")
+    probe = sqlite3.connect(":memory:")
+    try:
+        probe.execute("select value from json_each('[1]')")  # the maker-checker triggers need JSON functions
+    except sqlite3.OperationalError as exc:
+        raise RuntimeError("the SQLite provider needs SQLite's JSON functions, which this Python's SQLite "
+                           "lacks") from exc
+    finally:
+        probe.close()
     if parsed.database in (None, "", ":memory:") or str(parsed.database).startswith("file::memory:"):
         raise ValueError("the SQLite provider needs a database file (sqlite:///path/to/file.db); use the memory "
                          "provider for a database that lives in memory")
@@ -100,6 +109,7 @@ def create_engine(url: str, *, busy_timeout: timedelta = DEFAULT_BUSY_TIMEOUT) -
             raise ValueError(f"sqlite_begin must be one of {sorted(_BEGIN_MODES)}, not {mode!r}")
         conn.exec_driver_sql(f"begin {mode.lower()}")
 
+    _guard(engine)
     return engine
 
 
@@ -195,10 +205,47 @@ def _locked(exc: BaseException | None) -> bool:
 
 
 _open = threading.local()  # per thread: id(engine) -> the outermost open unit of work on that engine
+_UOW_KEY = "platform_kernel.sqlite.uow"  # connection.info: the unit of work that owns the connection
+
+
+class TransactionAborted(RuntimeError):
+    """SQLite ended the unit of work's transaction on its own (an interrupted write, a full disk, an I/O error or
+    out of memory). Nothing the unit of work wrote is kept, so no further statement may run and it cannot commit."""
+
+    def __init__(self) -> None:
+        super().__init__("SQLite rolled the unit of work's transaction back after an error; nothing it wrote is "
+                         "kept, and no further statement may run in it")
 
 
 def _outermost(engine: Any) -> SqliteUnitOfWork | None:
     return getattr(_open, "by_engine", {}).get(id(engine))
+
+
+def _owner(conn: Any) -> SqliteUnitOfWork | None:
+    try:
+        return conn.info.get(_UOW_KEY)
+    except Exception:  # noqa: BLE001 - a closed or invalidated connection has no owner
+        return None
+
+
+def _guard(engine: Any) -> None:
+    """Statements of a unit of work whose transaction SQLite ended on its own would run in autocommit mode
+    (sqlite3 opens no transactions of its own), so they are refused; the unit of work is poisoned."""
+    from sqlalchemy import event
+
+    @event.listens_for(engine, "before_cursor_execute")
+    def _before(conn: Any, _cursor: Any, _statement: Any, _params: Any, _context: Any, _many: Any) -> None:
+        uow = _owner(conn)
+        if uow is not None and (uow.poisoned or not uow._in_transaction()):
+            uow.poisoned = True
+            raise TransactionAborted()
+
+    @event.listens_for(engine, "handle_error")
+    def _on_error(context: Any) -> None:
+        conn = context.connection
+        uow = _owner(conn) if conn is not None else None
+        if uow is not None and not uow._in_transaction():
+            uow.poisoned = True
 
 
 class SqliteUnitOfWork:
@@ -207,23 +254,33 @@ class SqliteUnitOfWork:
     `tenant` and `platform_scope` say which rows the unit of work may see; the SQLite stores apply them in code.
 
     Nesting: SQLite has one writer per database file, so a unit of work opened while the same thread already holds
-    one on the same engine would wait for itself. Instead it joins the outer transaction: it shares the outer's
-    `connection`, `events`, `audit`, `inbox` and `dead_letters`, does not begin, and does not commit or roll back
-    when it exits. Its writes commit or roll back with the outer unit of work. An exception that leaves the inner
-    unit of work marks the outer as rollback-only: the outer then rolls back even if it exits cleanly, and raises
-    nothing beyond the original exception. Only `tenant` and `platform_scope` are the inner's own. Units of work
-    on different engines, and in different threads, stay independent."""
+    one on the same engine would wait for itself. Instead it joins the outer transaction as a savepoint: it shares
+    the outer's `connection`, `events`, `audit`, `inbox` and `dead_letters`. When it exits cleanly its savepoint is
+    released, and its writes commit or roll back with the outer unit of work. When an exception leaves it, only its
+    own writes are rolled back (to the savepoint); the outer carries on and commits what it wrote before and after.
+    `tenant` and `platform_scope` are the inner's own; the request deadline is the outer's, which was set when the
+    outer opened. Units of work on different engines, and in different threads, stay independent.
+
+    If SQLite ends the transaction on its own (an interrupted write, a full disk, an I/O error, out of memory), the
+    unit of work is poisoned: further statements raise `TransactionAborted`, and so does a clean exit, because
+    there is nothing left to commit."""
 
     def __init__(self, engine: Any, tenant: str | None, platform_scope: bool) -> None:
         self._engine = engine
         self._outer: SqliteUnitOfWork | None = None
-        self.rollback_only = False
+        self._savepoint: str | None = None
+        self._depth = 0  # savepoints opened by joined units of work, for unique names
+        self.poisoned = False
         self.tenant, self.platform_scope = tenant, platform_scope
         self.connection: Any = None
         self._tx: Any = None
         self._raw: Any = None
         self._busy_ms: int | None = None
         self._deadline: datetime | None = None
+        self._deadline_limits_wait = False
+
+    def _in_transaction(self) -> bool:
+        return self._raw is not None and bool(self._raw.in_transaction)
 
     def __enter__(self) -> SqliteUnitOfWork:
         from .. import context as ctxmod
@@ -231,8 +288,13 @@ class SqliteUnitOfWork:
         ctxmod.check_deadline("opening a unit of work")
         outer = _outermost(self._engine)
         if outer is not None:
-            self._outer = outer  # join: same connection and transaction, no BEGIN
+            if outer.poisoned or not outer._in_transaction():
+                outer.poisoned = True
+                raise TransactionAborted()
+            outer._depth += 1
+            self._outer, self._savepoint = outer, f"pf_uow_{outer._depth}"
             self.connection = outer.connection
+            self.connection.exec_driver_sql(f"savepoint {self._savepoint}")
             self.events, self.audit, self.inbox = outer.events, outer.audit, outer.inbox
             self.dead_letters = outer.dead_letters
             return self
@@ -245,15 +307,19 @@ class SqliteUnitOfWork:
                 # No wait for the write lock and no statement may outlive the request deadline (F10).
                 budget_ms = max(1, int((self._deadline - datetime.now(UTC)).total_seconds() * 1000))
                 self._busy_ms = int(self._raw.execute("pragma busy_timeout").fetchone()[0])
+                self._deadline_limits_wait = budget_ms <= self._busy_ms
                 self._raw.execute(f"pragma busy_timeout = {min(budget_ms, self._busy_ms)}")
                 deadline = self._deadline
                 self._raw.set_progress_handler(lambda: 1 if datetime.now(UTC) >= deadline else 0, 1000)
             self._tx = self.connection.begin()  # BEGIN IMMEDIATE: waits for the write lock
         except BaseException as exc:
             self._release()
-            if self._deadline is not None and (_locked(exc) or _interrupted(exc)) and ctxmod.deadline_exceeded():
+            if self._deadline is not None and ((_locked(exc) and self._deadline_limits_wait)
+                                               or (_interrupted(exc) and ctxmod.deadline_exceeded())):
+                # The wait for the lock was cut to the request's budget, so giving up means the deadline passed.
                 raise ctxmod.DeadlineExceeded("the database write lock was free") from exc
             raise
+        self.connection.info[_UOW_KEY] = self
         self.events = _Events(self.connection)
         self.audit = _Audit(self.connection)
         self.inbox = _Inbox(self.connection)
@@ -267,13 +333,12 @@ class SqliteUnitOfWork:
         from .. import context as ctxmod
 
         if self._outer is not None:
-            if exc_type is not None:
-                self._outer.rollback_only = True
-            self._outer, self.connection = None, None
+            self._exit_joined(exc_type)
             return
         _open.by_engine.pop(id(self._engine), None)
+        aborted = self.poisoned or not self._in_transaction()
         try:
-            if exc_type is None and not self.rollback_only:
+            if exc_type is None and not aborted:
                 self._tx.commit()
             else:
                 self._tx.rollback()
@@ -281,6 +346,22 @@ class SqliteUnitOfWork:
             self._release()
         if exc is not None and self._deadline is not None and _interrupted(exc) and ctxmod.deadline_exceeded():
             raise ctxmod.DeadlineExceeded("a database statement finished") from exc
+        if exc_type is None and aborted:
+            raise TransactionAborted()
+
+    def _exit_joined(self, exc_type: Any) -> None:
+        outer, name = self._outer, self._savepoint
+        self._outer, self._savepoint, self.connection = None, None, None
+        assert outer is not None and name is not None
+        outer._depth -= 1
+        if outer.poisoned or not outer._in_transaction():
+            outer.poisoned = True  # the savepoint went with the transaction
+            if exc_type is None:
+                raise TransactionAborted()
+            return
+        if exc_type is not None:
+            outer.connection.exec_driver_sql(f"rollback to {name}")
+        outer.connection.exec_driver_sql(f"release {name}")
 
     def _release(self) -> None:
         try:
@@ -290,6 +371,7 @@ class SqliteUnitOfWork:
         finally:
             self._raw, self._busy_ms = None, None
             if self.connection is not None:
+                self.connection.info.pop(_UOW_KEY, None)
                 self.connection.close()
                 self.connection = None
 

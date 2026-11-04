@@ -53,7 +53,20 @@ def default_persistence(database_url: str | None) -> str:
     for any other DATABASE_URL, and memory without one. Products choosing their own providers can follow it."""
     if not database_url:
         return "memory"
-    return "sqlite" if database_url.startswith("sqlite:") else "postgres"
+    return "sqlite" if _backend(database_url) == "sqlite" else "postgres"
+
+
+def _backend(database_url: str | None) -> str | None:
+    """The SQLAlchemy backend a URL names (`sqlite` for `sqlite+pysqlite:///x.db`), or None if it is no URL."""
+    if not database_url:
+        return None
+    from sqlalchemy.engine import make_url
+    from sqlalchemy.exc import ArgumentError
+
+    try:
+        return make_url(database_url).get_backend_name()
+    except ArgumentError:
+        return None
 
 
 class ConfigurationError(ValueError):
@@ -334,7 +347,8 @@ class PlatformBuilder:
         simulated: list[str] = []
         persistence = s.provider("persistence", default_persistence(s.database_url))
         engine = None
-        is_sqlite_url = bool(s.database_url) and s.database_url.startswith("sqlite:")  # type: ignore[union-attr]
+        backend = _backend(s.database_url)
+        is_sqlite_url = backend == "sqlite"
         if persistence == "memory":
             uow_factory = MemoryUnitOfWorkFactory()
             outbox: OutboxReader = MemoryOutboxReader(uow_factory.db)
@@ -344,7 +358,7 @@ class PlatformBuilder:
             op_store: Any = MemoryOperationStore()
             simulated.append("persistence")
         elif persistence == "postgres":
-            if not s.database_url or is_sqlite_url:
+            if backend != "postgresql":
                 problems.append("PROVIDER_PERSISTENCE=postgres needs a PostgreSQL DATABASE_URL")
                 uow_factory, outbox, idem, store = MemoryUnitOfWorkFactory(), None, None, None  # type: ignore[assignment]
                 op_store = None

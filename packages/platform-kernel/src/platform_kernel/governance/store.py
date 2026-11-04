@@ -179,8 +179,9 @@ def _sqlite_version(row: Any) -> Version:
 
 class SqliteGovernedStore:
     """SQLite has no row-level security, so every statement applies the unit of work's tenant scope in code, with
-    the rule of the PostgreSQL policy. The maker-checker rule is checked in code before every write, because a
-    SQLite check constraint cannot test membership of the `edited_by` JSON array (P14)."""
+    the rule of the PostgreSQL policy. The maker-checker rule is enforced twice, as on PostgreSQL (P14): in code
+    before every write, and in the database by a check constraint and by triggers that test membership of the
+    `edited_by` JSON array."""
 
     simulated = False
 
@@ -273,11 +274,11 @@ class SqliteGovernedStore:
 
         from ..persistence.sqlite import scope_clause, scope_params, to_text
 
-        # The rule of the PostgreSQL constraint maker_checker_second_person, which SQLite cannot express (P14).
+        # Mirror of the database's maker_checker_second_person check and triggers (P14: enforced twice).
         if version.maker_checker and version.approved_by and version.approved_by in version.authors:
             raise PermissionError("maker-checker: the approver must not have authored, edited or submitted it")
         self._in_scope(uow, version.tenant)
-        uow.connection.execute(text(
+        result = uow.connection.execute(text(
             "insert into governed_version (kind, id, version, tenant_id, status, spec, maker_checker, created_by, "
             "submitted_by, approved_by, test_result, edited_by, created_at, tested_by, tested_at, reason) values "
             "(:kind, :id, :v, :tenant, :status, :spec, :mc, :cb, :sb, :ab, :tr, :eb, :ca, :tb, :ta, :reason) "
@@ -293,3 +294,6 @@ class SqliteGovernedStore:
              "eb": json.dumps(list(version.edited_by)), "tb": version.tested_by,
              "ta": to_text(version.tested_at) if version.tested_at is not None else None, "reason": version.reason,
              "ca": to_text(version.created_at)} | scope_params(uow))
+        if result.rowcount != 1:
+            # The version exists in another tenant: PostgreSQL's row-level security refuses this write too.
+            raise PermissionError("the version is outside the unit of work's tenant scope")

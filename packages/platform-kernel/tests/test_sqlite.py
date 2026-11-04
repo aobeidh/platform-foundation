@@ -276,6 +276,50 @@ def test_an_approval_policy_that_reads_through_a_unit_of_work_does_not_deadlock(
     assert time.monotonic() - started < 5
 
 
+def test_a_consumer_that_handles_a_conflict_keeps_its_work_and_its_inbox_mark(sqlite_engine):
+    from platform_kernel.messaging import ConsumerRuntime
+    from platform_testing import sample_event
+
+    factory = SqliteUnitOfWorkFactory(sqlite_engine)
+    governance = GovernanceEngine(uow=factory, store=SqliteGovernedStore(), source="svc")
+    governance.register(KIND)
+    with as_user("alice", "t1"):
+        assert governance.create("rate", {"name": "vm", "amount": 1}, id="fixed").ok
+    calls: list[str] = []
+
+    def handler(env, uow) -> None:
+        calls.append(env.id)
+        uow.audit.append(audit_entry(subject="handled"))
+        assert governance.create("rate", {"name": "vm", "amount": 1}, id="fixed").error.code == "CONFLICT"
+
+    rt = ConsumerRuntime(factory)
+    rt.subscribe("test.thing.created.v1", "c1", handler)
+    e = sample_event(tenant="t1")
+    assert rt.deliver(e) is True
+    assert rt.deliver(e) is True and calls == [e.id]  # the inbox mark committed: no second run
+    assert [r.entry.subject for r in SqliteAuditReader(sqlite_engine).records("things")] == ["handled"]
+
+
+def test_after_sqlite_rolls_back_on_its_own_no_statement_runs_and_the_exit_raises(sqlite_engine):
+    from platform_kernel.persistence.sqlite import TransactionAborted
+    from sqlalchemy.exc import OperationalError
+
+    factory = SqliteUnitOfWorkFactory(sqlite_engine)
+    p = Principal("a", tenant="t1")
+    ctx = RequestContext(principal=p, tenant=TenantScope.resolve(p), correlation_id="c",
+                         deadline=datetime.now(UTC) + timedelta(milliseconds=200))
+    slow_write = ("insert into inbox (consumer, event_id, processed_at) with recursive c(x) as (select 1 union all "
+                  "select x + 1 from c where x < 500000000) select 'slow', x, 'x' from c")
+    with ctxmod.use(ctx), pytest.raises(TransactionAborted), factory() as u:
+        u.inbox.first_time("c1", "before")
+        with pytest.raises(OperationalError):
+            u.connection.execute(text(slow_write))  # interrupted: SQLite rolls the whole transaction back
+        with pytest.raises(TransactionAborted):
+            u.connection.execute(text("insert into inbox values ('c1', 'after', 'x')"))
+    with factory(platform_scope=True) as u:
+        assert u.connection.execute(text("select count(*) from inbox")).scalar() == 0
+
+
 # Deadlines (F10) ------------------------------------------------------------------------------------------------
 
 SLOW = "with recursive c(x) as (select 1 union all select x + 1 from c where x < 500000000) select count(*) from c"
@@ -308,6 +352,31 @@ def test_an_interrupted_statement_raises_deadline_exceeded_and_the_connection_is
         raw = u.connection.connection.dbapi_connection
         assert raw.execute("pragma busy_timeout").fetchone()[0] == 30_000
         assert u.connection.execute(text("select 1")).scalar() == 1
+
+
+def test_a_lock_wait_cut_short_by_the_deadline_is_deadline_exceeded_without_a_clock_check(sqlite_engine, monkeypatch):
+    factory = SqliteUnitOfWorkFactory(sqlite_engine)
+    holding, release = threading.Event(), threading.Event()
+
+    def hold() -> None:
+        with factory(platform_scope=True):
+            holding.set()
+            release.wait(10)
+
+    t = threading.Thread(target=hold)
+    t.start()
+    try:
+        assert holding.wait(5)
+        p = Principal("a", tenant="t1")
+        ctx = RequestContext(principal=p, tenant=TenantScope.resolve(p), correlation_id="c",
+                             deadline=datetime.now(UTC) + timedelta(milliseconds=200))
+        # The busy timeout is rounded down to whole milliseconds, so the wait may end just before the deadline.
+        monkeypatch.setattr(ctxmod, "deadline_exceeded", lambda now=None: False)
+        with ctxmod.use(ctx), pytest.raises(ctxmod.DeadlineExceeded), factory():
+            pass
+    finally:
+        release.set()
+        t.join(10)
 
 
 def test_waiting_for_the_write_lock_stops_at_the_deadline(sqlite_engine):
@@ -363,6 +432,41 @@ def test_maker_checker_refuses_an_editor_as_approver_in_the_engine_and_in_the_st
         assert governance.approve("rate", v.record.id, v.record.revision).value.record.status == "active"
 
 
+def test_the_database_refuses_an_editor_as_approver(governance, sqlite_engine):
+    from sqlalchemy.exc import IntegrityError
+
+    with as_user("alice"):
+        rid = governance.create("rate", {"name": "vm", "amount": 1}).value.record.id
+    with pytest.raises(IntegrityError, match="maker_checker"), sqlite_engine.begin() as c:
+        c.execute(text("update governed_version set edited_by = '[\"bob\", \"mallory\"]', submitted_by = 'alice', "
+                       "approved_by = 'mallory' where id = :i"), {"i": rid})
+    with pytest.raises(IntegrityError, match="maker_checker"), sqlite_engine.begin() as c:
+        c.execute(text("insert into governed_version (kind, id, version, tenant_id, status, spec, maker_checker, "
+                       "created_by, approved_by, edited_by, created_at) values ('rate', :i, 9, 't1', 'active', '{}', "
+                       "1, 'alice', 'mallory', '[\"mallory\"]', 'x')"), {"i": rid})
+    with sqlite_engine.begin() as c:  # without maker-checker, an editor may approve
+        c.execute(text("update governed_version set maker_checker = 0, edited_by = '[\"mallory\"]', "
+                       "approved_by = 'mallory' where id = :i"), {"i": rid})
+
+
+def test_upserts_never_touch_another_tenants_row(governance, sqlite_engine):
+    with as_user("alice", "t1"):
+        v = governance.create("rate", {"name": "vm", "amount": 1}, id="shared").value
+    store, factory = SqliteGovernedStore(), SqliteUnitOfWorkFactory(sqlite_engine)
+    with as_user("bob", "t2"), factory() as u, pytest.raises(PermissionError):
+        store.save_version(u, v.current.with_(tenant="t2", spec={"name": "stolen", "amount": 9}))
+    ops, now = SqliteOperationStore(), datetime.now(UTC)
+    with as_user("alice", "t1"), factory() as u:
+        ops.save(u, Operation(id="op", kind="k", tenant="t1", status="pending", input={}, created_by="alice",
+                              created_at=now, updated_at=now))
+    with as_user("bob", "t2"), factory() as u, pytest.raises(PermissionError):
+        ops.save(u, Operation(id="op", kind="k", tenant="t2", status="failed", input={}, created_by="bob",
+                              created_at=now, updated_at=now))
+    with as_user("alice", "t1"), factory() as u:
+        assert store.version(u, "rate", "shared", 1).spec == {"name": "vm", "amount": 1}
+        assert ops.get(u, "op").status == "pending"
+
+
 def test_the_database_check_refuses_the_creator_or_submitter_as_approver(governance, sqlite_engine):
     from sqlalchemy.exc import IntegrityError
 
@@ -411,7 +515,22 @@ def test_operations_are_scoped_to_the_tenant_in_code(sqlite_engine):
 def test_default_persistence_follows_the_database_url():
     assert default_persistence(None) == "memory"
     assert default_persistence("postgresql://u@h/db") == "postgres"
+    assert default_persistence("postgresql+psycopg://u@h/db") == "postgres"
     assert default_persistence("sqlite:///x.db") == "sqlite"
+    assert default_persistence("sqlite+pysqlite:///x.db") == "sqlite"
+
+
+def test_builder_takes_a_driver_qualified_sqlite_url_and_refuses_other_backends_for_postgres(tmp_path):
+    p = Platform.builder("svc", PlatformSettings.from_env("svc", {
+        "DATABASE_URL": f"sqlite+pysqlite:///{tmp_path / 'svc.db'}", "ALLOW_DEMO": "1"})).build()
+    try:
+        assert isinstance(p.uow, SqliteUnitOfWorkFactory)
+    finally:
+        p.close()
+    for url in ("mysql://u@h/db", "sqlite+pysqlite:///x.db"):
+        with pytest.raises(ConfigurationError, match="PostgreSQL DATABASE_URL"):
+            Platform.builder("svc", PlatformSettings.from_env("svc", {
+                "PROVIDER_PERSISTENCE": "postgres", "DATABASE_URL": url, "ALLOW_DEMO": "1"})).build()
 
 
 @pytest.mark.parametrize("env", [{"PROVIDER_PERSISTENCE": "sqlite"}, {}])

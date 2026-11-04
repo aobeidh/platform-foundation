@@ -14,6 +14,8 @@ class SqliteActivationRepository:
         from platform_kernel.persistence.sqlite import to_text
         from sqlalchemy import text
 
+        if not uow.platform_scope and (activation.tenant is None or activation.tenant != uow.tenant):
+            raise PermissionError("the activation is outside the unit of work's tenant scope")
         uow.connection.execute(text(
             "insert into activations (event_id, connection_id, version, tenant_id, activated_at) "
             "values (:e, :c, :v, :t, :at) on conflict do nothing"),
