@@ -16,6 +16,7 @@ from platform_kernel.operations import (
     PostgresOperationStore,
     Saga,
     SagaStep,
+    SqliteOperationStore,
     accepted,
 )
 from platform_kernel.persistence import MemoryOutboxReader, MemoryUnitOfWorkFactory
@@ -166,6 +167,36 @@ class TestMemoryOperations(_Operations):
     @pytest.fixture
     def events(self, uow):
         return lambda: [r.envelope.type for r in MemoryOutboxReader(uow.db).claim(100)]
+
+
+class TestSqliteOperations(_Operations):
+    @pytest.fixture
+    def uow(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteUnitOfWorkFactory
+
+        return SqliteUnitOfWorkFactory(sqlite_engine)
+
+    @pytest.fixture
+    def runner_factory(self, uow):
+        made = []
+
+        def make():
+            r = OperationRunner(uow=uow, store=SqliteOperationStore(), source="svc")
+            made.append(r)
+            return r
+        yield make
+        for r in made:
+            r.close()
+
+    @pytest.fixture
+    def runner(self, runner_factory):
+        return runner_factory()
+
+    @pytest.fixture
+    def events(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteOutboxReader
+
+        return lambda: [r.envelope.type for r in SqliteOutboxReader(sqlite_engine).claim(100)]
 
 
 @requires_postgres

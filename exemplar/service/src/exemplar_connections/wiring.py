@@ -5,12 +5,13 @@ from pathlib import Path
 
 from platform_kernel.config import PlatformSettings
 from platform_kernel.errors import ErrorCatalog
-from platform_kernel.platform import Platform
+from platform_kernel.platform import Platform, default_persistence
 from platform_kernel.policy import CapabilityCatalog, Role
 
 from .adapters.inbound.http import router
 from .adapters.outbound.memory_repo import MemoryActivationRepository
 from .adapters.outbound.postgres_repo import PostgresActivationRepository
+from .adapters.outbound.sqlite_repo import SqliteActivationRepository
 from .application.spi import SPI_VERSION, ConnectorSpi
 from .application.use_cases import (
     ActiveVersion,
@@ -51,8 +52,9 @@ def build(settings: PlatformSettings | None = None, *, discover_plugins: bool = 
         .with_plugin_kind("connector", ConnectorSpi, SPI_VERSION,
                           discover_group="exemplar.connectors" if discover_plugins else None)
         .with_provider("activations", {"memory": lambda p: MemoryActivationRepository(),
-                                       "postgres": lambda p: PostgresActivationRepository()},
-                       default="postgres" if settings.database_url else "memory")
+                                       "postgres": lambda p: PostgresActivationRepository(),
+                                       "sqlite": lambda p: SqliteActivationRepository()},
+                       default=settings.provider("persistence", default_persistence(settings.database_url)))
         .with_migrations(MIGRATIONS)
         .build()
     )

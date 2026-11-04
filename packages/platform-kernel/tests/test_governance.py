@@ -6,7 +6,13 @@ import pytest
 from platform_kernel import context as ctxmod
 from platform_kernel.audit import verify_chain
 from platform_kernel.context import Principal, RequestContext, TenantScope
-from platform_kernel.governance import GovernanceEngine, GovernedKind, MemoryGovernedStore, PostgresGovernedStore
+from platform_kernel.governance import (
+    GovernanceEngine,
+    GovernedKind,
+    MemoryGovernedStore,
+    PostgresGovernedStore,
+    SqliteGovernedStore,
+)
 from platform_kernel.persistence import MemoryOutboxReader, MemoryUnitOfWorkFactory
 from platform_plugin_sdk import Check
 from platform_testing import requires_postgres
@@ -130,6 +136,44 @@ class TestMemoryGovernance(_Lifecycle):
     @pytest.fixture
     def audit(self, uow):
         return uow.audit_records
+
+
+class TestSqliteGovernance(_Lifecycle):
+    @pytest.fixture
+    def uow(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteUnitOfWorkFactory
+
+        return SqliteUnitOfWorkFactory(sqlite_engine)
+
+    @pytest.fixture
+    def engine(self, uow):
+        e = GovernanceEngine(uow=uow, store=SqliteGovernedStore(), source="svc")
+        e.register(KIND)
+        return e
+
+    @pytest.fixture
+    def events(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteOutboxReader
+
+        return lambda: [r.envelope.type for r in SqliteOutboxReader(sqlite_engine).claim(100)]
+
+    @pytest.fixture
+    def audit(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteAuditReader
+
+        return SqliteAuditReader(sqlite_engine).records
+
+    def test_the_store_hides_other_tenants_in_code(self, engine, uow):
+        with as_user("maker", "t1"):
+            rid = engine.create("rate", {"name": "vm", "amount": 1}).value.record.id
+        store = SqliteGovernedStore()
+        with as_user("other", "t2"), uow() as u:
+            assert store.get(u, "rate", rid) is None and store.versions(u, "rate", rid) == []
+            assert store.list(u, "rate", "t1", True) == []
+        with as_user("maker", "t1"), uow() as u:
+            assert store.get(u, "rate", rid) is not None and len(store.versions(u, "rate", rid)) == 1
+        with uow(platform_scope=True) as u:
+            assert [r.id for r in store.list(u, "rate", None, True)] == [rid]
 
 
 @requires_postgres

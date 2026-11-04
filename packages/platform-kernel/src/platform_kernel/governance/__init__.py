@@ -10,9 +10,10 @@ from .model import (
     StaticApprovalPolicy,
     Version,
 )
-from .store import GovernedStore, MemoryGovernedStore, PostgresGovernedStore
+from .store import GovernedStore, MemoryGovernedStore, PostgresGovernedStore, SqliteGovernedStore
 
 __all__ = [
     "ApprovalPolicy", "ApprovalRule", "GovernanceEngine", "GovernedKind", "GovernedStore", "GovernedView",
-    "MemoryGovernedStore", "PostgresGovernedStore", "Record", "StaticApprovalPolicy", "Version", "governed_router",
+    "MemoryGovernedStore", "PostgresGovernedStore", "Record", "SqliteGovernedStore", "StaticApprovalPolicy", "Version",
+    "governed_router",
 ]

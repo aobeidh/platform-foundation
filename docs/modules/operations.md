@@ -8,7 +8,7 @@
 
 **Ports and API:** `OperationRunner` (register, register_saga, start, get, recent, cancel, resume_unfinished; `GET /operations` lists what the caller may see), `Handle` (progress, save_state, check_cancelled), `Saga`, `SagaStep`, `SagaStalled`, `accepted()`, `operations_router`, `Orchestrator` port. Statuses: pending, running, stalled, succeeded, failed, cancelled.
 
-**Providers:** In-process runner with `MemoryOperationStore` or `PostgresOperationStore` (table `operation`, row-level security). Temporal is a later provider behind `Orchestrator`.
+**Providers:** In-process runner with `MemoryOperationStore`, `PostgresOperationStore` (table `operation`, row-level security) or `SqliteOperationStore` (tenant scope in code; the unit of work's write lock replaces row locks). Temporal is a later provider behind `Orchestrator`.
 
 **Example:**
 

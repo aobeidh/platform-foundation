@@ -11,10 +11,10 @@ from .runner import (
     SagaStalled,
     SagaStep,
 )
-from .store import MemoryOperationStore, OperationStore, PostgresOperationStore
+from .store import MemoryOperationStore, OperationStore, PostgresOperationStore, SqliteOperationStore
 
 __all__ = [
     "FINISHED", "RESUMABLE", "Handle", "MemoryOperationStore", "Operation", "OperationCancelled",
     "OperationFailed", "OperationRunner", "OperationStore", "Orchestrator", "PostgresOperationStore", "Saga",
-    "SagaStalled", "SagaStep", "accepted", "operations_router",
+    "SagaStalled", "SagaStep", "SqliteOperationStore", "accepted", "operations_router",
 ]

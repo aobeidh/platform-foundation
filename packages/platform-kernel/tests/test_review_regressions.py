@@ -152,6 +152,17 @@ class TestMemoryGovernanceRegressions(_Governance):
         return e
 
 
+class TestSqliteGovernanceRegressions(_Governance):
+    @pytest.fixture
+    def engine(self, sqlite_engine):
+        from platform_kernel.governance import SqliteGovernedStore
+        from platform_kernel.persistence.sqlite import SqliteUnitOfWorkFactory
+
+        e = GovernanceEngine(uow=SqliteUnitOfWorkFactory(sqlite_engine), store=SqliteGovernedStore(), source="svc")
+        e.register(KIND)
+        return e
+
+
 @requires_postgres
 class TestPostgresGovernanceRegressions(_Governance):
     @pytest.fixture

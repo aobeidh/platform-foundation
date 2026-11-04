@@ -5,7 +5,7 @@
     pk check manifests       manifest schema, unique names, acyclic service graph, events have a publisher
     pk check contracts       each service's OpenAPI matches its committed contract (drift check)
     pk check spec            spec/ schemas match the reference models
-    pk check migrations      destructive SQL needs an explicit, reasoned marker (P32)
+    pk check migrations      destructive SQL needs an explicit, reasoned marker (P32); sqlite/ versions match
     pk check guides          every kernel module has its one-page guide (F20)
     pk update contracts|spec regenerate committed files after a reviewed change
     pk scaffold service NAME [--dir services]
@@ -178,7 +178,16 @@ def check_migrations(root: Path, update: bool = False) -> list[str]:
         if data.get("migrations"):
             dirs.append(path.parent / data["migrations"])
     for d in dirs:
-        for sql in sorted(d.glob("*.sql")):
+        sqlite = d / "sqlite"
+        if sqlite.is_dir():
+            # A SQLite version of every migration, with the same file name, and nothing else (ADR 0008).
+            names, sqlite_names = {p.name for p in d.glob("*.sql")}, {p.name for p in sqlite.glob("*.sql")}
+            for name in sorted(names - sqlite_names):
+                problems.append(f"{(sqlite / name).relative_to(root)}: missing; every migration needs a SQLite "
+                                f"version with the same file name")
+            for name in sorted(sqlite_names - names):
+                problems.append(f"{(sqlite / name).relative_to(root)}: has no PostgreSQL migration of the same name")
+        for sql in sorted([*d.glob("*.sql"), *sqlite.glob("*.sql")]):
             for i, line in enumerate(sql.read_text(encoding="utf-8").splitlines(), 1):
                 if DESTRUCTIVE.search(line) and not ALLOW_MARKER.search(line):
                     problems.append(f"{sql.relative_to(root)}:{i}: destructive statement; follow expand and "
