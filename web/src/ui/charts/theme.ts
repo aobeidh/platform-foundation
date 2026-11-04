@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useMountRoot } from '@/lib/mount';
 
 export interface ChartTheme {
   text: string; dim: string; line: string; card: string; panel2: string; accent: string; bad: string; forecast: string;
   font: string; isRtl: boolean; reducedMotion: boolean; resolve: (cssColor: string) => string;
 }
 
-let probe: HTMLSpanElement | null = null;
+const probes = new WeakMap<HTMLElement, HTMLSpanElement>();
 let ctx2d: CanvasRenderingContext2D | null = null;
 
 /**
@@ -13,10 +14,13 @@ let ctx2d: CanvasRenderingContext2D | null = null;
  * compute it on a hidden probe and painting that onto a 1 px canvas.
  */
 function makeResolver(root: HTMLElement) {
+  // One probe per root: a portal mounted in a shadow root resolves its own tokens, not the host page's.
+  let probe = probes.get(root);
   if (!probe || !probe.isConnected) {
     probe = document.createElement('span');
     probe.style.display = 'none';
     root.appendChild(probe);
+    probes.set(root, probe);
   }
   if (!ctx2d) {
     const canvas = document.createElement('canvas');
@@ -54,22 +58,27 @@ export function withAlpha(rgba: string, alpha: number) {
 
 function read(root: HTMLElement): ChartTheme {
   const resolve = makeResolver(root);
+  const dirOf = root.closest('[dir]')?.getAttribute('dir') ?? document.documentElement.dir;
   return {
     text: resolve('var(--fg)'), dim: resolve('var(--fg-dim)'), line: resolve('var(--line)'), card: resolve('var(--card)'),
     panel2: resolve('var(--panel-strong)'), accent: resolve('var(--accent)'), bad: resolve('var(--bad)'), forecast: resolve('var(--forecast)'),
-    font: getComputedStyle(document.body).fontFamily, isRtl: document.documentElement.dir === 'rtl',
+    font: getComputedStyle(root).fontFamily, isRtl: dirOf === 'rtl',
     reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false, resolve,
   };
 }
 
-/** Re-resolves when the .dark class or dir on <html> changes, so charts recolour and mirror without reload. */
+/** Re-resolves when the .dark class or dir on the mount root (<html> by default) changes, so charts recolour and
+ * mirror without reload. */
 export function useChartTheme(): ChartTheme {
-  const [theme, setTheme] = useState(() => read(document.body));
+  const mount = useMountRoot();
+  const root = mount === document.documentElement ? document.body : mount;
+  const [theme, setTheme] = useState(() => read(root));
   useEffect(() => {
-    const mo = new MutationObserver(() => setTheme(read(document.body)));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'dir', 'data-theme'] });
+    setTheme(read(root));
+    const mo = new MutationObserver(() => setTheme(read(root)));
+    mo.observe(mount, { attributes: true, attributeFilter: ['class', 'dir', 'data-theme'] });
     return () => mo.disconnect();
-  }, []);
+  }, [mount, root]);
   return theme;
 }
 

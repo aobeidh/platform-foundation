@@ -2,6 +2,12 @@
 
 ## 0.4.0 (unreleased)
 
+### web-kit: mounting inside another page
+- `MountProvider` (`@/lib/mount`) names the element that carries the theme class, `lang` and `dir` (`root`) and
+  where overlays open (`overlays`), for a portal mounted inside a host's page such as a custom element with a shadow
+  root. `PrefsProvider`, the chart theme, the lineage graph and the dialog, sheet, select, popover and tooltip atoms
+  follow it; `initialTheme(root)` reads `data-theme` on it. Without a `MountProvider`, `<html>` and `<body>` as before.
+
 ### SQLite persistence (ADR 0008)
 - `platform_kernel.persistence.sqlite`: `create_engine(url)` for a `sqlite:///path` URL (WAL journal mode, foreign
   keys, a busy timeout, explicit transactions), `SqliteUnitOfWorkFactory`, `SqliteUnitOfWork` (`BEGIN IMMEDIATE`, so

@@ -77,6 +77,7 @@
       "registryDependencies": [
         "@platform/format",
         "@platform/i18n",
+        "@platform/mount",
         "@platform/theme"
       ],
       "files": [
@@ -84,6 +85,25 @@
           "path": "src/lib/prefs.tsx",
           "type": "registry:file",
           "target": "src/lib/prefs.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mount",
+      "type": "registry:ui",
+      "title": "mount",
+      "description": "@platform/web-kit mount (lib/mount.tsx)",
+      "dependencies": [
+        "react@19.3.1"
+      ],
+      "registryDependencies": [
+        "@platform/theme"
+      ],
+      "files": [
+        {
+          "path": "src/lib/mount.tsx",
+          "type": "registry:file",
+          "target": "src/lib/mount.tsx"
         }
       ]
     },
@@ -122,6 +142,7 @@
         "react@19.3.1"
       ],
       "registryDependencies": [
+        "@platform/mount",
         "@platform/theme",
         "@platform/utils"
       ],
@@ -459,6 +480,7 @@
       ],
       "registryDependencies": [
         "@platform/button",
+        "@platform/mount",
         "@platform/theme",
         "@platform/utils"
       ],
@@ -566,6 +588,7 @@
         "react@19.3.1"
       ],
       "registryDependencies": [
+        "@platform/mount",
         "@platform/theme",
         "@platform/utils"
       ],
@@ -629,6 +652,7 @@
         "react@19.3.1"
       ],
       "registryDependencies": [
+        "@platform/mount",
         "@platform/theme",
         "@platform/utils"
       ],
@@ -672,6 +696,7 @@
         "react@19.3.1"
       ],
       "registryDependencies": [
+        "@platform/mount",
         "@platform/theme",
         "@platform/utils"
       ],
@@ -905,6 +930,7 @@
         "react@19.3.1"
       ],
       "registryDependencies": [
+        "@platform/mount",
         "@platform/theme",
         "@platform/utils"
       ],
@@ -1305,6 +1331,7 @@
         "react@19.3.1"
       ],
       "registryDependencies": [
+        "@platform/mount",
         "@platform/theme",
         "@platform/utils",
         "@platform/viz-utils"

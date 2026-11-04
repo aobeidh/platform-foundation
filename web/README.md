@@ -58,6 +58,15 @@ suite holds the live service to it.
 
 Business data from the API (connection names, subjects, plugin ids) is shown as it comes and is not translated.
 
+## Mounting inside another page
+
+A product may mount its portal inside a host's page, for example as a custom element with a shadow root. Wrap it in
+`MountProvider` (`@/lib/mount`) with `root`, the element that carries the theme class, `lang` and `dir`, and
+`overlays`, an element inside the styles' reach where dialogs, sheets, menus, popovers and tooltips open. Then
+`PrefsProvider` never changes the host's `<html>`, charts read their colors and direction from `root`, and overlays
+are styled. `initialTheme(root)` reads the host's `data-theme` on that element. Without a `MountProvider` nothing
+changes: `<html>` and `<body>`, as before.
+
 ## Registry
 
 `npm run registry:build` writes `registry.json` (one item per component; `echart`, `i18n`, `api-kit` and
