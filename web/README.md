@@ -62,10 +62,12 @@ Business data from the API (connection names, subjects, plugin ids) is shown as 
 
 A product may mount its portal inside a host's page, for example as a custom element with a shadow root. Wrap it in
 `MountProvider` (`@/lib/mount`) with `root`, the element that carries the theme class, `lang` and `dir`, and
-`overlays`, an element inside the styles' reach where dialogs, sheets, menus, popovers and tooltips open. Then
-`PrefsProvider` never changes the host's `<html>`, charts read their colors and direction from `root`, and overlays
-are styled. `initialTheme(root)` reads the host's `data-theme` on that element. Without a `MountProvider` nothing
-changes: `<html>` and `<body>`, as before.
+`overlays`, an element inside the styles' reach where dialogs, sheets, menus, popovers and tooltips open, and
+`storagePrefix`, which keeps the theme, language and demo identity it saves apart from a host that uses this kit
+too. Then `PrefsProvider` never changes the host's `<html>`, charts read their colors and direction from `root`,
+overlays are styled, and selects open below their trigger (item-aligned placement works in window coordinates).
+`initialTheme(root, storagePrefix)` reads `data-theme` on that element, and the theme follows later changes to it.
+Without a `MountProvider` nothing changes: `<html>` and `<body>`, as before.
 
 ## Registry
 
