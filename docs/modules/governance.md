@@ -8,7 +8,7 @@
 
 **Ports and API:** `GovernanceEngine` (create, update_draft, test, submit, approve, reject, discard, pause, resume, retire, get, list, versions, active_spec, rule_for); `GovernedKind`; `GovernedStore`; `ApprovalPolicy` with `ApprovalRule(approval, require_test)`.
 
-**Providers:** `MemoryGovernedStore`, `PostgresGovernedStore` (row-level security; constraint `maker_checker_second_person`). `StaticApprovalPolicy` from settings (`APPROVAL`, `REQUIRE_TEST`) or `with_approval_policy(...)`; products may store the policy as settings of their own.
+**Providers:** `MemoryGovernedStore`, `PostgresGovernedStore` (row-level security; constraint `maker_checker_second_person`), `SqliteGovernedStore` (tenant scope and the full maker-checker rule in code; `edited_by` is a JSON array, and the database check covers the creator and the submitter). `StaticApprovalPolicy` from settings (`APPROVAL`, `REQUIRE_TEST`) or `with_approval_policy(...)`; products may store the policy as settings of their own.
 
 **Example:**
 

@@ -81,6 +81,26 @@ class TestMemoryMessaging(_Wiring):
         return uow_factory.db.state["dead_letter"]
 
 
+class TestSqliteMessaging(_Wiring):
+    @pytest.fixture
+    def uow_factory(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteUnitOfWorkFactory
+
+        return SqliteUnitOfWorkFactory(sqlite_engine)
+
+    @pytest.fixture
+    def reader(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteOutboxReader
+
+        return SqliteOutboxReader(sqlite_engine)
+
+    def dead_letters(self, uow_factory):
+        from sqlalchemy import text
+
+        with uow_factory.engine.begin() as c:
+            return [dict(r._mapping) for r in c.execute(text("select kind, reason from dead_letter order by at"))]
+
+
 @requires_postgres
 class TestPostgresMessaging(_Wiring):
     @pytest.fixture

@@ -4,6 +4,7 @@ import pytest
 from platform_kernel.persistence import MemoryIdempotencyStore, MemoryOutboxReader, MemoryUnitOfWorkFactory
 from platform_testing import (
     IdempotencyStoreContract,
+    JoiningUnitOfWorkContract,
     OutboxReaderContract,
     UnitOfWorkContract,
     requires_postgres,
@@ -76,6 +77,48 @@ class TestPostgresOutbox(_Postgres, OutboxReaderContract):
 
 
 class TestPostgresIdempotency(_Postgres, IdempotencyStoreContract):
+    pass
+
+
+class _Sqlite:
+    @pytest.fixture
+    def uow_factory(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteUnitOfWorkFactory
+
+        return SqliteUnitOfWorkFactory(sqlite_engine)
+
+    @pytest.fixture
+    def outbox_reader(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteOutboxReader
+
+        return SqliteOutboxReader(sqlite_engine)
+
+    @pytest.fixture
+    def audit_records(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteAuditReader
+
+        return SqliteAuditReader(sqlite_engine).records
+
+    @pytest.fixture
+    def idempotency_store(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteIdempotencyStore
+
+        return SqliteIdempotencyStore(sqlite_engine)
+
+
+class TestSqliteUnitOfWork(_Sqlite, UnitOfWorkContract):
+    pass
+
+
+class TestSqliteJoiningUnitOfWork(_Sqlite, JoiningUnitOfWorkContract):
+    pass
+
+
+class TestSqliteOutbox(_Sqlite, OutboxReaderContract):
+    pass
+
+
+class TestSqliteIdempotency(_Sqlite, IdempotencyStoreContract):
     pass
 
 

@@ -10,6 +10,7 @@ from platform_kernel.governance import (
     GovernedKind,
     MemoryGovernedStore,
     PostgresGovernedStore,
+    SqliteGovernedStore,
     StaticApprovalPolicy,
 )
 from platform_kernel.persistence import MemoryOutboxReader, MemoryUnitOfWorkFactory
@@ -164,6 +165,24 @@ class TestMemoryApproval(_Approval):
         return lambda: [r.envelope.type for r in MemoryOutboxReader(uow.db).claim(100)]
 
 
+class TestSqliteApproval(_Approval):
+    @pytest.fixture
+    def uow(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteUnitOfWorkFactory
+
+        return SqliteUnitOfWorkFactory(sqlite_engine)
+
+    @pytest.fixture
+    def store(self):
+        return SqliteGovernedStore()
+
+    @pytest.fixture
+    def events(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteOutboxReader
+
+        return lambda: [r.envelope.type for r in SqliteOutboxReader(sqlite_engine).claim(100)]
+
+
 @requires_postgres
 class TestPostgresApproval(_Approval):
     @pytest.fixture
@@ -251,6 +270,11 @@ class _Review04:
 class TestMemoryReview04(_Review04):
     uow = TestMemoryApproval.uow
     store = TestMemoryApproval.store
+
+
+class TestSqliteReview04(_Review04):
+    uow = TestSqliteApproval.uow
+    store = TestSqliteApproval.store
 
 
 @requires_postgres

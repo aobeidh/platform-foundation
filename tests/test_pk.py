@@ -63,6 +63,22 @@ def test_destructive_migrations_need_a_reason(tmp_path):
     assert cli.check_migrations(root) == []
 
 
+def test_sqlite_migrations_match_by_name_and_are_checked_for_destructive_sql(tmp_path):
+    root = repo(tmp_path, {"alpha": {"migrations": "migrations"}})
+    (root / "packages/platform-kernel/src/platform_kernel/persistence/sql").mkdir(parents=True)
+    mig = root / "alpha" / "migrations"
+    (mig / "sqlite").mkdir(parents=True)
+    (mig / "0001_a.sql").write_text("create table a (x jsonb);\n", encoding="utf-8")
+    (mig / "0002_b.sql").write_text("create table b (x jsonb);\n", encoding="utf-8")
+    (mig / "sqlite" / "0001_a.sql").write_text("create table a (x text);\n", encoding="utf-8")
+    (mig / "sqlite" / "0003_c.sql").write_text("drop table a;\n", encoding="utf-8")
+    problems = cli.check_migrations(root)
+    assert len(problems) == 3
+    assert any("sqlite/0002_b.sql: missing" in p for p in problems)
+    assert any("sqlite/0003_c.sql: has no PostgreSQL" in p for p in problems)
+    assert any("sqlite/0003_c.sql:1: destructive" in p for p in problems)
+
+
 def test_contract_drift_is_detected():
     problems = cli.check_contracts(ROOT)
     assert problems == []

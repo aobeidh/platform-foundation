@@ -6,7 +6,7 @@ contracts, governed configuration, tenant isolation, an outbox, idempotency, aud
 instead of rebuilding them.
 
 **Status: milestone 0.2.** Every layer exists, thin but complete, and is proven end to end by an
-exemplar service on both in-memory providers and PostgreSQL. Pre-1.0 versions may change their API between minor
+exemplar service on in-memory providers, SQLite and PostgreSQL. Pre-1.0 versions may change their API between minor
 releases (F1).
 
 ## What is in the box
@@ -15,7 +15,7 @@ releases (F1).
 |---|---|
 | `platform-plugin-sdk` | The lowest layer: types every plugin and host share. Depends only on pydantic, so third-party plugins never pull in the kernel. |
 | `platform-kernel` | Seven layers of modules (see [ADR 0002](docs/adr/0002-kernel-layers.md)), each a port with in-memory and production providers. |
-| `platform-testing` | Contract suites every provider must pass, and PostgreSQL test helpers. |
+| `platform-testing` | Contract suites every provider must pass, and PostgreSQL and SQLite test helpers. |
 | `platform-tools` | `pk`, the one command that runs every architecture and contract check, locally and in CI. |
 | `exemplar/` | A reference service (`connections`) and plugin (`echo`) that use every module (F15). |
 | `web/` | `@platform/web-kit`: the portal kit (atomic design system, ECharts, API port, governed-record screens) and the exemplar portal. See [web/README.md](web/README.md). |
@@ -40,7 +40,7 @@ one-page guide in [docs/modules](docs/modules).
 ```bash
 uv sync
 uv run pk check        # layers, manifests, contracts, spec, migrations, guides
-uv run pytest          # memory providers; set PF_TEST_DATABASE_URL to add PostgreSQL
+uv run pytest          # memory and SQLite providers; set PF_TEST_DATABASE_URL to add PostgreSQL
 ```
 
 To run the PostgreSQL suites, use a **non-superuser** role so row-level security is enforced:

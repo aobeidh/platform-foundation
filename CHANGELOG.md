@@ -2,6 +2,24 @@
 
 ## 0.4.0 (unreleased)
 
+### SQLite persistence (ADR 0008)
+- `platform_kernel.persistence.sqlite`: `create_engine(url)` for a `sqlite:///path` URL (WAL journal mode, foreign
+  keys, a busy timeout, explicit transactions), `SqliteUnitOfWorkFactory`, `SqliteUnitOfWork` (`BEGIN IMMEDIATE`, so
+  one writer at a time), `SqliteOutboxReader`, `SqliteIdempotencyStore` and `SqliteAuditReader`.
+  `SqliteGovernedStore` and `SqliteOperationStore` port the PostgreSQL stores. All pass the shared contract suites.
+- A unit of work opened in a thread that already holds one on the same engine joins it; an exception that leaves the
+  inner one makes the outer roll back.
+- Timestamps are stored as text with `to_text` (UTC, exactly `%Y-%m-%dT%H:%M:%S.%fZ`) and read with `from_text`.
+  `scope_clause` and `scope_params` apply the tenant scope in code, since SQLite has no row-level security.
+- Migrations: a `sqlite/` subfolder in each migration directory holds the SQLite version of each file, with the same
+  name. `migrations.migrate_sqlite` applies them; `platform.migrate()` uses it on SQLite. `pk check migrations`
+  reports SQLite files that are missing or have no PostgreSQL counterpart.
+- The builder uses SQLite for `PROVIDER_PERSISTENCE=sqlite`, or for a `DATABASE_URL` that starts with `sqlite:` when
+  no provider is named (`platform.default_persistence`). It refuses a PostgreSQL provider with a SQLite URL and the
+  other way around. The readiness probe no longer waits for SQLite's write lock.
+- platform-testing: `JoiningUnitOfWorkContract` and `fresh_sqlite(directory, product_dirs)`. The exemplar runs on
+  SQLite as well.
+
 ### Portal sign-in (ADR 0007)
 - `GET /api/v1/portal/sign-in` is public and says how a portal signs people in: OIDC settings when
   `with_oidc(..., portal_client_id=..., portal_scopes=...)` names a public client, `demo` with demo tokens, or `none`.

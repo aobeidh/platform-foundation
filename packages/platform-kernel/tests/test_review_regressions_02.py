@@ -268,6 +268,20 @@ class TestMemoryRegressions(_Regressions):
         return runner_factory()
 
 
+class TestSqliteRegressions(TestMemoryRegressions):
+    @pytest.fixture
+    def uow(self, sqlite_engine):
+        from platform_kernel.persistence.sqlite import SqliteUnitOfWorkFactory
+
+        return SqliteUnitOfWorkFactory(sqlite_engine)
+
+    @pytest.fixture
+    def store(self):
+        from platform_kernel.operations import SqliteOperationStore
+
+        return SqliteOperationStore()
+
+
 @requires_postgres
 class TestPostgresRegressions(TestMemoryRegressions):
     @pytest.fixture

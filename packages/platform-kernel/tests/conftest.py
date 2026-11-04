@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from platform_testing import database_url, fresh_schema
+from platform_testing import database_url, fresh_schema, fresh_sqlite
 
 
 @pytest.fixture(scope="session")
@@ -19,3 +19,9 @@ def pg_engine():
 @pytest.fixture
 def pg_schema(pg_engine):
     yield from fresh_schema(pg_engine)
+
+
+@pytest.fixture
+def sqlite_engine(tmp_path):
+    """A migrated SQLite database on a temporary file. SQLite suites always run."""
+    yield from fresh_sqlite(tmp_path)

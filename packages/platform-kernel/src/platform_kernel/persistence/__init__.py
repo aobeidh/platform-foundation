@@ -1,6 +1,7 @@
-"""Layer 3. Units of work, outbox, inbox, idempotency and audit storage, with memory and PostgreSQL providers.
+"""Layer 3. Units of work, outbox, inbox, idempotency and audit storage, with memory, PostgreSQL and SQLite providers.
 
-The PostgreSQL providers live in `platform_kernel.persistence.postgres` and import SQLAlchemy lazily (F5)."""
+The PostgreSQL providers live in `platform_kernel.persistence.postgres` and the SQLite providers in
+`platform_kernel.persistence.sqlite`; both import SQLAlchemy lazily (F5)."""
 from .memory import (
     MemoryDatabase,
     MemoryIdempotencyStore,

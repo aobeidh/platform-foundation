@@ -60,6 +60,70 @@ class UnitOfWorkContract:
         assert verify_chain(records) == (True, None)
 
 
+class JoiningUnitOfWorkContract:
+    """For providers where a unit of work opened in a thread that already holds one joins it (SQLite: one writer
+    per database file). Needs fixtures: uow_factory, outbox_reader."""
+
+    def test_nested_unit_of_work_sees_the_outer_uncommitted_write(self, uow_factory):
+        with uow_factory(platform_scope=True) as outer:
+            assert outer.inbox.first_time("c1", "e1") is True
+            with uow_factory(platform_scope=True) as inner:
+                assert inner.connection is outer.connection
+                assert inner.inbox.first_time("c1", "e1") is False
+                assert inner.inbox.first_time("c1", "e2") is True
+        with uow_factory(platform_scope=True) as uow:
+            assert uow.inbox.first_time("c1", "e2") is False  # the inner write committed with the outer
+
+    def test_an_exception_in_the_inner_rolls_back_the_whole(self, uow_factory, outbox_reader):
+        e = sample_event()
+        with uow_factory(platform_scope=True) as outer:
+            outer.events.publish([e])
+            try:
+                with uow_factory(platform_scope=True) as inner:
+                    inner.inbox.first_time("c1", "e1")
+                    raise RuntimeError("inner failed")
+            except RuntimeError:
+                pass  # the outer exits cleanly, but it is rollback-only now
+        assert outbox_reader.claim(10) == []
+        with uow_factory(platform_scope=True) as uow:
+            assert uow.inbox.first_time("c1", "e1") is True
+
+    def test_a_nested_open_does_not_wait_for_the_write_lock(self, uow_factory):
+        import time
+
+        started = time.monotonic()
+        with uow_factory(platform_scope=True), uow_factory(platform_scope=True) as inner:
+            inner.inbox.first_time("c1", "e1")
+        assert time.monotonic() - started < 2
+
+    def test_two_threads_still_take_turns(self, uow_factory):
+        import threading
+        import time
+
+        order: list[str] = []
+        holding = threading.Event()
+
+        def first() -> None:
+            with uow_factory(platform_scope=True) as u:
+                u.inbox.first_time("c1", "first")
+                holding.set()
+                time.sleep(0.3)
+                order.append("first commits")
+
+        def second() -> None:
+            holding.wait(5)
+            with uow_factory(platform_scope=True) as u:
+                order.append("second begins")
+                u.inbox.first_time("c1", "second")
+
+        threads = [threading.Thread(target=first), threading.Thread(target=second)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(10)
+        assert order == ["first commits", "second begins"]
+
+
 class OutboxReaderContract:
     """Needs fixtures: uow_factory, outbox_reader."""
 

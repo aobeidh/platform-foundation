@@ -21,6 +21,7 @@ from ..governance import (
     GovernedKind,
     MemoryGovernedStore,
     PostgresGovernedStore,
+    SqliteGovernedStore,
     StaticApprovalPolicy,
     governed_router,
 )
@@ -28,7 +29,13 @@ from ..http import Authorizer, EgressPolicy, HttpSettings, OAuthTokenService, Re
 from ..identity import CachedJwksSource, DemoTokenVerifier, OidcTokenVerifier, TokenVerifier
 from ..messaging import ConsumerRuntime, LocalTransport, PollingRelay
 from ..observability import get_logger
-from ..operations import MemoryOperationStore, OperationRunner, PostgresOperationStore, operations_router
+from ..operations import (
+    MemoryOperationStore,
+    OperationRunner,
+    PostgresOperationStore,
+    SqliteOperationStore,
+    operations_router,
+)
 from ..persistence import (
     IdempotencyStore,
     MemoryIdempotencyStore,
@@ -39,6 +46,14 @@ from ..persistence import (
 )
 from ..plugins import AllowUnsignedVerifier, PluginHost, SignatureVerifier
 from ..policy import CapabilityCatalog, InProcessPolicyEngine, PolicyEngine, Role
+
+
+def default_persistence(database_url: str | None) -> str:
+    """The persistence provider when PROVIDER_PERSISTENCE names none: sqlite for a `sqlite:` DATABASE_URL, postgres
+    for any other DATABASE_URL, and memory without one. Products choosing their own providers can follow it."""
+    if not database_url:
+        return "memory"
+    return "sqlite" if database_url.startswith("sqlite:") else "postgres"
 
 
 class ConfigurationError(ValueError):
@@ -162,18 +177,22 @@ class Platform:
             readiness=probes, version=version, public_routers=public_routers)
 
     def migrate(self) -> list[str]:
-        """Apply kernel and product migrations. Run as the migration role, not the application role (P7)."""
+        """Apply kernel and product migrations. Run as the migration role, not the application role (P7). On SQLite
+        each migration directory needs a `sqlite/` subfolder with SQLite versions of its files (ADR 0008)."""
         if self._engine is None:
             return []
-        from ..persistence.migrations import migrate
+        from ..persistence.migrations import migrate, migrate_sqlite
 
+        if self._engine.dialect.name == "sqlite":
+            return migrate_sqlite(self._engine, self._migrations)
         return migrate(self._engine, self.settings.schema_name or self.settings.service.replace("-", "_"),
                        self._migrations)
 
     def _database_ready(self) -> bool:
         from sqlalchemy import text
 
-        with self._engine.connect() as c:
+        # sqlite_begin: a read-only probe must not wait for SQLite's write lock (other dialects ignore it).
+        with self._engine.execution_options(sqlite_begin="DEFERRED").connect() as c:
             return c.execute(text("select 1")).scalar() == 1
 
     def close(self) -> None:
@@ -313,8 +332,9 @@ class PlatformBuilder:
         s = self._settings
         problems: list[str] = []
         simulated: list[str] = []
-        persistence = s.provider("persistence", "postgres" if s.database_url else "memory")
+        persistence = s.provider("persistence", default_persistence(s.database_url))
         engine = None
+        is_sqlite_url = bool(s.database_url) and s.database_url.startswith("sqlite:")  # type: ignore[union-attr]
         if persistence == "memory":
             uow_factory = MemoryUnitOfWorkFactory()
             outbox: OutboxReader = MemoryOutboxReader(uow_factory.db)
@@ -324,8 +344,8 @@ class PlatformBuilder:
             op_store: Any = MemoryOperationStore()
             simulated.append("persistence")
         elif persistence == "postgres":
-            if not s.database_url:
-                problems.append("PROVIDER_PERSISTENCE=postgres needs DATABASE_URL")
+            if not s.database_url or is_sqlite_url:
+                problems.append("PROVIDER_PERSISTENCE=postgres needs a PostgreSQL DATABASE_URL")
                 uow_factory, outbox, idem, store = MemoryUnitOfWorkFactory(), None, None, None  # type: ignore[assignment]
                 op_store = None
             else:
@@ -343,8 +363,33 @@ class PlatformBuilder:
                 idem = PostgresIdempotencyStore(engine, schema, timedelta(hours=s.idempotency_retention_hours))
                 store = PostgresGovernedStore()
                 op_store = PostgresOperationStore()
+        elif persistence == "sqlite":
+            if not is_sqlite_url:
+                problems.append("PROVIDER_PERSISTENCE=sqlite needs a DATABASE_URL of the form sqlite:///path/to/file.db")
+                uow_factory, outbox, idem, store = MemoryUnitOfWorkFactory(), None, None, None  # type: ignore[assignment]
+                op_store = None
+            else:
+                from ..persistence.sqlite import (
+                    SqliteIdempotencyStore,
+                    SqliteOutboxReader,
+                    SqliteUnitOfWorkFactory,
+                )
+                from ..persistence.sqlite import create_engine as create_sqlite_engine
+
+                try:
+                    engine = create_sqlite_engine(s.database_url)  # type: ignore[arg-type]
+                except (ValueError, RuntimeError) as exc:
+                    problems.append(str(exc))
+                    uow_factory, outbox, idem, store = MemoryUnitOfWorkFactory(), None, None, None  # type: ignore[assignment]
+                    op_store = None
+                else:
+                    uow_factory = SqliteUnitOfWorkFactory(engine)
+                    outbox = SqliteOutboxReader(engine)
+                    idem = SqliteIdempotencyStore(engine, timedelta(hours=s.idempotency_retention_hours))
+                    store = SqliteGovernedStore()
+                    op_store = SqliteOperationStore()
         else:
-            problems.append(str(UnknownProvider("persistence", persistence, ["memory", "postgres"])))
+            problems.append(str(UnknownProvider("persistence", persistence, ["memory", "postgres", "sqlite"])))
             uow_factory, outbox, idem, store = MemoryUnitOfWorkFactory(), None, None, None  # type: ignore[assignment]
             op_store = None
 

@@ -1,4 +1,4 @@
-"""End-to-end proof that the kernel works as one system (F15), in memory and on PostgreSQL."""
+"""End-to-end proof that the kernel works as one system (F15), in memory, on SQLite and on PostgreSQL."""
 from __future__ import annotations
 
 import uuid
@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 import pytest
 from exemplar_connections.adapters.outbound.memory_repo import MemoryActivationRepository
 from exemplar_connections.adapters.outbound.postgres_repo import PostgresActivationRepository
+from exemplar_connections.adapters.outbound.sqlite_repo import SqliteActivationRepository
 from exemplar_connections.domain import Activation
 from exemplar_connections.wiring import build
 from fastapi.testclient import TestClient
@@ -21,11 +22,13 @@ OTHER_TENANT = {"Authorization": "Bearer demo:oli:integration-admin,integration-
 BOTH_ROLES = {"Authorization": "Bearer demo:max:integration-admin,integration-approver:t1"}
 
 
-@pytest.fixture(params=["memory", pytest.param("postgres", marks=requires_postgres)])
-def system(request):
-    if request.param == "memory":
-        settings = PlatformSettings(service="connections", allow_demo=True)
+@pytest.fixture(params=["memory", "sqlite", pytest.param("postgres", marks=requires_postgres)])
+def system(request, tmp_path):
+    if request.param in ("memory", "sqlite"):
+        url = f"sqlite:///{tmp_path / 'connections.db'}" if request.param == "sqlite" else None
+        settings = PlatformSettings(service="connections", allow_demo=True, database_url=url)
         platform, app = build(settings)
+        platform.migrate()
         yield platform, TestClient(app)
         platform.close()
         return
@@ -141,7 +144,8 @@ def _activation(tenant: str) -> Activation:
 def test_activation_repository_contract(system):
     platform, _ = system
     # Runs once per persistence provider through the `system` fixture.
-    repo = MemoryActivationRepository() if platform._engine is None else PostgresActivationRepository()
+    repo = (MemoryActivationRepository() if platform._engine is None else SqliteActivationRepository()
+            if platform._engine.dialect.name == "sqlite" else PostgresActivationRepository())
     a1, a2 = _activation("t1"), _activation("t2")
 
     def as_tenant(t):
